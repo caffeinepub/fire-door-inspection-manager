@@ -563,7 +563,7 @@ function from_candid_variant_n25(_uploadFile: (file: ExternalBlob) => Promise<Ui
 } | {
     single: null;
 }): DoorType {
-    return "double" in value ? DoorType.double : "hinged" in value ? DoorType.hinged : "sliding" in value ? DoorType.sliding : "single" in value ? DoorType.single : value;
+    return "double" in value ? DoorType.double_: "hinged" in value ? DoorType.hinged : "sliding" in value ? DoorType.sliding : "single" in value ? DoorType.single : value;
 }
 function from_candid_variant_n27(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: {
     timber: null;
@@ -819,8 +819,8 @@ function to_candid_variant_n6(_uploadFile: (file: ExternalBlob) => Promise<Uint8
 } | {
     single: null;
 } {
-    return value == DoorType.double ? {
-        double_: null
+    return value == DoorType.double_? {
+        double: null
     } : value == DoorType.hinged ? {
         hinged: null
     } : value == DoorType.sliding ? {

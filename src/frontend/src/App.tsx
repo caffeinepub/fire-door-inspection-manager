@@ -37,10 +37,11 @@ import {
 } from "./hooks/useQueries";
 import { Dashboard } from "./pages/Dashboard";
 import { DoorDetailPage } from "./pages/DoorDetailPage";
+import { DoorStatusPage } from "./pages/DoorStatusPage";
 import { DoorsPage } from "./pages/DoorsPage";
 import { InspectionForm } from "./pages/InspectionForm";
 
-type Page = "dashboard" | "doors" | "door-detail" | "inspect";
+type Page = "dashboard" | "doors" | "door-detail" | "inspect" | "status";
 
 export interface LastInspectionInfo {
   date: bigint;
@@ -161,6 +162,8 @@ export default function App() {
   const queryClient = useQueryClient();
   const isAuthenticated = !!identity;
 
+  const initialLoading = !actor && actorFetching;
+
   const {
     data: userProfile,
     isLoading: profileLoading,
@@ -184,6 +187,9 @@ export default function App() {
     if (doorIdParam && pageParam === "inspect") {
       setActiveDoorId(BigInt(doorIdParam));
       setPage("inspect");
+    } else if (doorIdParam && pageParam === "status") {
+      setActiveDoorId(BigInt(doorIdParam));
+      setPage("status");
     }
   }, []);
 
@@ -269,17 +275,62 @@ export default function App() {
     }
   };
 
+  // Public status page — accessible without login
+  if (page === "status" && activeDoorId !== null) {
+    // If user just logged in, redirect to inspect page for that door
+    if (isAuthenticated) {
+      return (
+        <div className="min-h-screen bg-background flex flex-col">
+          <header className="bg-fire-red text-white shadow-md">
+            <div className="max-w-lg mx-auto px-4 h-14 flex items-center justify-between">
+              <div className="flex items-center gap-2.5">
+                <Flame className="w-5 h-5" />
+                <span className="font-bold text-lg">Fire Door Inspector</span>
+              </div>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={handleAuth}
+                className="text-white hover:bg-white/10 hover:text-white"
+              >
+                <LogOut className="w-4 h-4 mr-1.5" />
+                Logout
+              </Button>
+            </div>
+          </header>
+          <main className="flex-1 max-w-lg mx-auto w-full px-4 py-8">
+            <DoorStatusPage
+              doorId={activeDoorId}
+              onLogin={handleAuth}
+              isLoggingIn={isLoggingIn}
+            />
+            <div className="mt-4 text-center">
+              <Button
+                className="bg-fire-red hover:bg-fire-red-dark text-white"
+                onClick={() => navigate("inspect", activeDoorId)}
+              >
+                <ClipboardList className="w-4 h-4 mr-2" />
+                Start Inspection
+              </Button>
+            </div>
+          </main>
+        </div>
+      );
+    }
+    return (
+      <DoorStatusPage
+        doorId={activeDoorId}
+        onLogin={handleAuth}
+        isLoggingIn={isLoggingIn}
+      />
+    );
+  }
+
   const showProfileSetup =
     isAuthenticated &&
     !profileLoading &&
     profileFetched &&
     userProfile === null;
-
-  const navItems = [
-    { label: "Dashboard", page: "dashboard" as Page, icon: LayoutDashboard },
-    { label: "Doors", page: "doors" as Page, icon: DoorOpen },
-    { label: "Inspect", page: "inspect" as Page, icon: ClipboardList },
-  ];
 
   if (!isAuthenticated && !isLoggingIn) {
     return (
@@ -330,6 +381,12 @@ export default function App() {
       </div>
     );
   }
+
+  const navItems = [
+    { label: "Dashboard", page: "dashboard" as Page, icon: LayoutDashboard },
+    { label: "Doors", page: "doors" as Page, icon: DoorOpen },
+    { label: "Inspect", page: "inspect" as Page, icon: ClipboardList },
+  ];
 
   return (
     <div className="min-h-screen bg-background flex flex-col">
@@ -438,7 +495,7 @@ export default function App() {
 
       {/* Main content */}
       <main className="flex-1 max-w-[1100px] mx-auto w-full px-4 py-6">
-        {actorFetching ? (
+        {initialLoading ? (
           <div
             className="flex items-center justify-center py-20"
             data-ocid="app.loading_state"

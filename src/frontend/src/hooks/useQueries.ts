@@ -11,6 +11,7 @@ export function useGetAllDoors() {
       return actor.getAllDoors();
     },
     enabled: !!actor && !isFetching,
+    refetchOnMount: "always",
   });
 }
 

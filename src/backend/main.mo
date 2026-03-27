@@ -243,7 +243,7 @@ actor {
     if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
       Runtime.trap("Unauthorized: Only users can view doors");
     };
-    doors.values().toArray().sort();
+    doors.values().filter(func(d : Door.Door) : Bool { d.active }).toArray().sort();
   };
 
   public query ({ caller }) func getInspectionsForDoor(doorId : DoorId) : async [Inspection.Inspection] {

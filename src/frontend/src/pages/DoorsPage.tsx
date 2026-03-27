@@ -19,26 +19,16 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
-import {
-  CheckCircle2,
-  Eye,
-  FileUp,
-  Image,
-  Pencil,
-  Plus,
-  Search,
-  Trash2,
-  XCircle,
-} from "lucide-react";
+import { Eye, FileUp, Image, Pencil, Plus, Search, Trash2 } from "lucide-react";
 import { useMemo, useState } from "react";
 import { toast } from "sonner";
+
 import type { LastInspectionInfo } from "../App";
 import type { Door } from "../backend";
 import { BulkImportDialog } from "../components/BulkImportDialog";
 import { DoorModal } from "../components/DoorModal";
 import { QRCodeSVG } from "../components/QRCode";
 import { QRCodeDialog } from "../components/QRCodeDialog";
-import { StatusBadge } from "../components/StatusBadge";
 import { useDeleteDoor, useGetAllDoors } from "../hooks/useQueries";
 
 type Page = "dashboard" | "doors" | "door-detail" | "inspect";
@@ -47,16 +37,6 @@ interface DoorsPageProps {
   isAdmin: boolean;
   onNavigate: (page: Page, doorId?: bigint) => void;
   lastInspectionMap: Record<string, LastInspectionInfo | undefined>;
-}
-
-function CheckCell({ value }: { value: boolean | undefined }) {
-  if (value === undefined)
-    return <span className="text-muted-foreground text-xs">—</span>;
-  return value ? (
-    <CheckCircle2 className="w-4 h-4 text-green-600" />
-  ) : (
-    <XCircle className="w-4 h-4 text-red-500" />
-  );
 }
 
 const SKELETON_COL_KEYS = [
@@ -71,22 +51,12 @@ const SKELETON_COL_KEYS = [
   "c9",
   "c10",
   "c11",
-  "c12",
-  "c13",
-  "c14",
-  "c15",
-  "c16",
-  "c17",
-  "c18",
-  "c19",
-  "c20",
-  "c21",
 ];
 
 export function DoorsPage({
   isAdmin,
   onNavigate,
-  lastInspectionMap,
+  lastInspectionMap: _lastInspectionMap,
 }: DoorsPageProps) {
   const { data: doors = [], isLoading } = useGetAllDoors();
   const deleteDoor = useDeleteDoor();
@@ -211,16 +181,6 @@ export function DoorsPage({
                 <th className={th}>Frame Material</th>
                 <th className={th}>Door Type</th>
                 <th className={th}>Location</th>
-                <th className={th}>Frame Condition</th>
-                <th className={th}>Hinges</th>
-                <th className={th}>Lockset</th>
-                <th className={th}>Glass</th>
-                <th className={th}>Seals</th>
-                <th className={th}>Closer</th>
-                <th className={th}>Structure</th>
-                <th className={th}>Signage</th>
-                <th className={th}>Gaps</th>
-                <th className={th}>Door</th>
                 <th className={th}>Pictures</th>
                 <th className="text-right px-3 py-3 text-xs font-semibold uppercase tracking-wider text-white">
                   Actions
@@ -241,7 +201,7 @@ export function DoorsPage({
               ) : filtered.length === 0 ? (
                 <tr>
                   <td
-                    colSpan={21}
+                    colSpan={11}
                     className="px-4 py-10 text-center text-muted-foreground"
                     data-ocid="doors.empty_state"
                   >
@@ -250,9 +210,7 @@ export function DoorsPage({
                 </tr>
               ) : (
                 filtered.map((door, idx) => {
-                  const last = lastInspectionMap[door.id.toString()];
-                  const cl = last?.checklist;
-                  const qrValue = `${window.location.origin}${window.location.pathname}?doorId=${door.id.toString()}&page=inspect`;
+                  const qrValue = `${window.location.origin}${window.location.pathname}?doorId=${door.id.toString()}&page=status`;
                   return (
                     <tr
                       key={door.id.toString()}
@@ -314,46 +272,6 @@ export function DoorsPage({
                           {" "}
                           / {door.floor} / {door.location}
                         </span>
-                      </td>
-                      {/* Frame Condition */}
-                      <td className="px-3 py-3">
-                        <CheckCell value={cl?.frame} />
-                      </td>
-                      {/* Hinges */}
-                      <td className="px-3 py-3">
-                        <CheckCell value={cl?.hinges} />
-                      </td>
-                      {/* Lockset */}
-                      <td className="px-3 py-3">
-                        <CheckCell value={cl?.latch} />
-                      </td>
-                      {/* Glass */}
-                      <td className="px-3 py-3">
-                        <CheckCell value={cl?.glazing} />
-                      </td>
-                      {/* Seals */}
-                      <td className="px-3 py-3">
-                        <CheckCell value={cl?.seals} />
-                      </td>
-                      {/* Closer */}
-                      <td className="px-3 py-3">
-                        <CheckCell value={cl?.doorCloser} />
-                      </td>
-                      {/* Structure */}
-                      <td className="px-3 py-3">
-                        <CheckCell value={cl?.doorLeaf} />
-                      </td>
-                      {/* Signage */}
-                      <td className="px-3 py-3">
-                        <CheckCell value={cl?.signage} />
-                      </td>
-                      {/* Gaps */}
-                      <td className="px-3 py-3">
-                        <CheckCell value={cl?.intumescentStrip} />
-                      </td>
-                      {/* Door (leaf/obstruction) */}
-                      <td className="px-3 py-3">
-                        <CheckCell value={cl?.noObstructions} />
                       </td>
                       {/* Pictures */}
                       <td className="px-3 py-3">

@@ -21,7 +21,8 @@ export function QRCodeDialog({
   doorId,
   doorLabel,
 }: QRCodeDialogProps) {
-  const qrValue = `${window.location.origin}${window.location.pathname}?doorId=${doorId.toString()}&page=inspect`;
+  // Points to public status page — no login required for clients
+  const qrValue = `${window.location.origin}${window.location.pathname}?doorId=${doorId.toString()}&page=status`;
 
   const handlePrint = () => {
     const printWindow = window.open("", "_blank");
@@ -33,7 +34,7 @@ export function QRCodeDialog({
       .url{font-size:11px;color:#999;margin-top:16px;word-break:break-all;max-width:280px;text-align:center;}
       </style></head><body>
       <h2>${doorLabel}</h2>
-      <p>Scan to open inspection form</p>
+      <p>Scan to view door inspection status</p>
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" width="256" height="256">
       ${document.getElementById("qr-print-target")?.innerHTML ?? ""}
       </svg>

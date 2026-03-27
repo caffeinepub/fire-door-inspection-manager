@@ -22,7 +22,8 @@ export function DoorDetailPage({ doorId, onNavigate }: DoorDetailPageProps) {
     useGetInspectionsForDoor(doorId);
   const [qrOpen, setQrOpen] = useState(false);
 
-  const qrValue = `${window.location.origin}${window.location.pathname}?doorId=${doorId.toString()}&page=inspect`;
+  // QR points to public status page (no login required)
+  const qrValue = `${window.location.origin}${window.location.pathname}?doorId=${doorId.toString()}&page=status`;
 
   const formatDate = (ts: bigint) => {
     const ms = Number(ts / 1000000n);
@@ -30,8 +31,6 @@ export function DoorDetailPage({ doorId, onNavigate }: DoorDetailPageProps) {
       day: "2-digit",
       month: "short",
       year: "numeric",
-      hour: "2-digit",
-      minute: "2-digit",
     });
   };
 
@@ -164,7 +163,7 @@ export function DoorDetailPage({ doorId, onNavigate }: DoorDetailPageProps) {
             <QRCodeSVG value={qrValue} size={180} level="H" />
           </div>
           <p className="text-xs text-muted-foreground text-center">
-            Scan to open inspection form
+            Scan to view door status (no login required)
           </p>
           <div className="flex gap-2 w-full">
             <Button

@@ -64,7 +64,8 @@ export function InspectionForm({
   inspectorName = "",
   onNavigate,
 }: InspectionFormProps) {
-  const { data: doors = [], isLoading } = useGetAllDoors();
+  const { data: allDoors = [], isLoading } = useGetAllDoors();
+  const doors = allDoors.filter((d) => d.active);
   const addInspection = useAddInspection();
 
   const [selectedDoorId, setSelectedDoorId] = useState<string>(
