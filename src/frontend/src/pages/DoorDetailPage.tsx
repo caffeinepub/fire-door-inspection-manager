@@ -1,7 +1,13 @@
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import { ChevronLeft, ClipboardList, Printer, QrCode } from "lucide-react";
+import {
+  ChevronLeft,
+  ClipboardList,
+  FileText,
+  Printer,
+  QrCode,
+} from "lucide-react";
 import { useState } from "react";
 import { InspectionStatus } from "../backend";
 import { QRCodeSVG } from "../components/QRCode";
@@ -9,11 +15,11 @@ import { QRCodeDialog } from "../components/QRCodeDialog";
 import { StatusBadge } from "../components/StatusBadge";
 import { useGetDoor, useGetInspectionsForDoor } from "../hooks/useQueries";
 
-type Page = "dashboard" | "doors" | "door-detail" | "inspect";
+type Page = "dashboard" | "doors" | "door-detail" | "inspect" | "report";
 
 interface DoorDetailPageProps {
   doorId: bigint;
-  onNavigate: (page: Page, doorId?: bigint) => void;
+  onNavigate: (page: Page, doorId?: bigint, inspectionId?: bigint) => void;
 }
 
 export function DoorDetailPage({ doorId, onNavigate }: DoorDetailPageProps) {
@@ -219,10 +225,10 @@ export function DoorDetailPage({ doorId, onNavigate }: DoorDetailPageProps) {
               return (
                 <div
                   key={insp.id.toString()}
-                  className="px-5 py-4 flex flex-wrap gap-3 items-center justify-between"
+                  className="px-5 py-4 flex flex-wrap gap-3 items-start justify-between"
                   data-ocid={`door_detail.inspections.item.${idx + 1}`}
                 >
-                  <div>
+                  <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 mb-1">
                       <StatusBadge status={insp.overallStatus} size="sm" />
                       <span className="text-sm font-medium">
@@ -238,21 +244,30 @@ export function DoorDetailPage({ doorId, onNavigate }: DoorDetailPageProps) {
                         "{insp.notes}"
                       </p>
                     )}
+                    <div className="flex flex-wrap gap-1 mt-2">
+                      {Object.entries(insp.checklist).map(([key, val]) => (
+                        <span
+                          key={key}
+                          className={`text-[10px] px-1.5 py-0.5 rounded border font-medium ${
+                            val
+                              ? "bg-green-50 text-green-700 border-green-200"
+                              : "bg-red-50 text-red-700 border-red-200"
+                          }`}
+                        >
+                          {checklistLabels[key] ?? key}
+                        </span>
+                      ))}
+                    </div>
                   </div>
-                  <div className="flex flex-wrap gap-1">
-                    {Object.entries(insp.checklist).map(([key, val]) => (
-                      <span
-                        key={key}
-                        className={`text-[10px] px-1.5 py-0.5 rounded border font-medium ${
-                          val
-                            ? "bg-green-50 text-green-700 border-green-200"
-                            : "bg-red-50 text-red-700 border-red-200"
-                        }`}
-                      >
-                        {checklistLabels[key] ?? key}
-                      </span>
-                    ))}
-                  </div>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => onNavigate("report", door.id, insp.id)}
+                    data-ocid={`door_detail.inspections.report.button.${idx + 1}`}
+                  >
+                    <FileText className="w-3.5 h-3.5 mr-1" />
+                    Report
+                  </Button>
                 </div>
               );
             })}

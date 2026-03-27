@@ -11,6 +11,7 @@ import {
   XCircle,
 } from "lucide-react";
 import { Loader2, LogIn } from "lucide-react";
+import { useActor } from "../hooks/useActor";
 import { useInternetIdentity } from "../hooks/useInternetIdentity";
 import { useGetDoor, useGetInspectionsForDoor } from "../hooks/useQueries";
 
@@ -68,8 +69,9 @@ export function DoorStatusPage({
   onLogin,
   isLoggingIn,
 }: DoorStatusPageProps) {
+  const { isFetching: actorFetching } = useActor();
   const { data: door, isLoading: doorLoading } = useGetDoor(doorId);
-  const { data: inspections = [], isLoading: inspLoading } =
+  const { data: inspections, isLoading: inspLoading } =
     useGetInspectionsForDoor(doorId);
 
   const latestInspection =
@@ -101,7 +103,7 @@ export function DoorStatusPage({
       </header>
 
       <main className="flex-1 max-w-lg mx-auto w-full px-4 py-8 space-y-5">
-        {doorLoading || inspLoading ? (
+        {doorLoading || inspLoading || actorFetching ? (
           <div className="space-y-4">
             <Skeleton className="h-8 w-48" />
             <Skeleton className="h-48" />

@@ -40,8 +40,15 @@ import { DoorDetailPage } from "./pages/DoorDetailPage";
 import { DoorStatusPage } from "./pages/DoorStatusPage";
 import { DoorsPage } from "./pages/DoorsPage";
 import { InspectionForm } from "./pages/InspectionForm";
+import { InspectionReportPage } from "./pages/InspectionReportPage";
 
-type Page = "dashboard" | "doors" | "door-detail" | "inspect" | "status";
+type Page =
+  | "dashboard"
+  | "doors"
+  | "door-detail"
+  | "inspect"
+  | "status"
+  | "report";
 
 export interface LastInspectionInfo {
   date: bigint;
@@ -175,6 +182,9 @@ export default function App() {
 
   const [page, setPage] = useState<Page>("dashboard");
   const [activeDoorId, setActiveDoorId] = useState<bigint | null>(null);
+  const [activeInspectionId, setActiveInspectionId] = useState<bigint | null>(
+    null,
+  );
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [seeded, setSeeded] = useState(false);
   const [allInspections, setAllInspections] = useState<Inspection[]>([]);
@@ -253,11 +263,15 @@ export default function App() {
     return map;
   })();
 
-  const navigate = useCallback((p: Page, doorId?: bigint) => {
-    setPage(p);
-    setActiveDoorId(doorId ?? null);
-    setMobileMenuOpen(false);
-  }, []);
+  const navigate = useCallback(
+    (p: Page, doorId?: bigint, inspectionId?: bigint) => {
+      setPage(p);
+      setActiveDoorId(doorId ?? null);
+      setActiveInspectionId(inspectionId ?? null);
+      setMobileMenuOpen(false);
+    },
+    [],
+  );
 
   const handleAuth = async () => {
     if (isAuthenticated) {
@@ -504,7 +518,11 @@ export default function App() {
           </div>
         ) : (
           <motion.div
-            key={page + (activeDoorId?.toString() ?? "")}
+            key={
+              page +
+              (activeDoorId?.toString() ?? "") +
+              (activeInspectionId?.toString() ?? "")
+            }
             initial={{ opacity: 0, y: 8 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.2 }}
@@ -532,6 +550,15 @@ export default function App() {
                 onNavigate={navigate}
               />
             )}
+            {page === "report" &&
+              activeDoorId !== null &&
+              activeInspectionId !== null && (
+                <InspectionReportPage
+                  doorId={activeDoorId}
+                  inspectionId={activeInspectionId}
+                  onBack={() => navigate("door-detail", activeDoorId)}
+                />
+              )}
           </motion.div>
         )}
       </main>

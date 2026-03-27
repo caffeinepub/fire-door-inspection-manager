@@ -1,5 +1,11 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import type { Door, DoorId, Inspection, UserProfile } from "../backend";
+import type {
+  Door,
+  DoorId,
+  Inspection,
+  InspectionId,
+  UserProfile,
+} from "../backend";
 import { useActor } from "./useActor";
 
 export function useGetAllDoors() {
@@ -28,27 +34,52 @@ export function useGetDoorCount() {
 }
 
 export function useGetDoor(doorId: DoorId | null) {
-  const { actor, isFetching } = useActor();
-  return useQuery<Door | null>({
+  const { actor, isFetching: actorFetching } = useActor();
+  const query = useQuery<Door | null>({
     queryKey: ["door", doorId?.toString()],
     queryFn: async () => {
       if (!actor || doorId === null) return null;
       return actor.getDoor(doorId);
     },
-    enabled: !!actor && !isFetching && doorId !== null,
+    enabled: !!actor && !actorFetching && doorId !== null,
   });
+  return {
+    ...query,
+    isLoading: actorFetching || query.isLoading,
+  };
+}
+
+export function useGetInspection(id: InspectionId | null) {
+  const { actor, isFetching: actorFetching } = useActor();
+  const query = useQuery<Inspection | null>({
+    queryKey: ["inspection", id?.toString()],
+    queryFn: async () => {
+      if (!actor || id === null) return null;
+      return actor.getInspection(id);
+    },
+    enabled: !!actor && !actorFetching && id !== null,
+  });
+  return {
+    ...query,
+    isLoading: actorFetching || query.isLoading,
+  };
 }
 
 export function useGetInspectionsForDoor(doorId: DoorId | null) {
-  const { actor, isFetching } = useActor();
-  return useQuery<Inspection[]>({
+  const { actor, isFetching: actorFetching } = useActor();
+  const query = useQuery<Inspection[]>({
     queryKey: ["inspections", doorId?.toString()],
     queryFn: async () => {
       if (!actor || doorId === null) return [];
       return actor.getInspectionsForDoor(doorId);
     },
-    enabled: !!actor && !isFetching && doorId !== null,
+    enabled: !!actor && !actorFetching && doorId !== null,
   });
+  return {
+    ...query,
+    isLoading: actorFetching || query.isLoading,
+    data: query.data ?? [],
+  };
 }
 
 export function useGetCallerUserProfile() {
