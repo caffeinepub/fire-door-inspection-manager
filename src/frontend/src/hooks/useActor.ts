@@ -30,9 +30,10 @@ export function useActor() {
       await actor._initializeAccessControlWithSecret(adminToken);
       return actor;
     },
-    // Only refetch when identity changes
+    // Never mark stale or evict from cache so the actor persists across
+    // background inactivity without triggering the loading spinner again
     staleTime: Number.POSITIVE_INFINITY,
-    // This will cause the actor to be recreated when the identity changes
+    gcTime: Number.POSITIVE_INFINITY,
     enabled: true,
   });
 
