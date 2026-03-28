@@ -118,7 +118,9 @@ export const idlService = IDL.Service({
       [IDL.Opt(UserProfile)],
       ['query'],
     ),
-  'isCallerAdmin' : IDL.Func([], [IDL.Bool], ['query']),
+  'getPublicDoor' : IDL.Func([DoorId], [IDL.Opt(Door)], ['query']),
+    'getPublicInspectionsForDoor' : IDL.Func([DoorId], [IDL.Vec(Inspection)], ['query']),
+    'isCallerAdmin' : IDL.Func([], [IDL.Bool], ['query']),
   'saveCallerUserProfile' : IDL.Func([UserProfile], [], []),
 });
 
@@ -235,6 +237,8 @@ export const idlFactory = ({ IDL }) => {
         [IDL.Opt(UserProfile)],
         ['query'],
       ),
+    'getPublicDoor' : IDL.Func([DoorId], [IDL.Opt(Door)], ['query']),
+    'getPublicInspectionsForDoor' : IDL.Func([DoorId], [IDL.Vec(Inspection)], ['query']),
     'isCallerAdmin' : IDL.Func([], [IDL.Bool], ['query']),
     'saveCallerUserProfile' : IDL.Func([UserProfile], [], []),
   });

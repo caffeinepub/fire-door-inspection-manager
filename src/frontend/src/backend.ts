@@ -192,6 +192,8 @@ export interface backendInterface {
     getInspection(inspectionId: InspectionId): Promise<Inspection>;
     getInspectionsForDoor(doorId: DoorId): Promise<Array<Inspection>>;
     getUserProfile(user: Principal): Promise<UserProfile | null>;
+    getPublicDoor(doorId: DoorId): Promise<Door | null>;
+    getPublicInspectionsForDoor(doorId: DoorId): Promise<Array<Inspection>>;
     isCallerAdmin(): Promise<boolean>;
     saveCallerUserProfile(profile: UserProfile): Promise<void>;
 }
@@ -406,6 +408,34 @@ export class Backend implements backendInterface {
         } else {
             const result = await this.actor.getUserProfile(arg0);
             return from_candid_opt_n37(this._uploadFile, this._downloadFile, result);
+        }
+    }
+    async getPublicDoor(arg0: DoorId): Promise<Door | null> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.getPublicDoor(arg0);
+                return result.length > 0 ? from_candid_Door_n20(this._uploadFile, this._downloadFile, result[0]) : null;
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await this.actor.getPublicDoor(arg0);
+            return result.length > 0 ? from_candid_Door_n20(this._uploadFile, this._downloadFile, result[0]) : null;
+        }
+    }
+    async getPublicInspectionsForDoor(arg0: DoorId): Promise<Array<Inspection>> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.getPublicInspectionsForDoor(arg0);
+                return from_candid_vec_n32(this._uploadFile, this._downloadFile, result);
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await this.actor.getPublicInspectionsForDoor(arg0);
+            return from_candid_vec_n32(this._uploadFile, this._downloadFile, result);
         }
     }
     async isCallerAdmin(): Promise<boolean> {

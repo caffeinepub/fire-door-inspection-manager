@@ -13,7 +13,10 @@ import {
 import { Loader2, LogIn } from "lucide-react";
 import { useActor } from "../hooks/useActor";
 import { useInternetIdentity } from "../hooks/useInternetIdentity";
-import { useGetDoor, useGetInspectionsForDoor } from "../hooks/useQueries";
+import {
+  useGetPublicDoor,
+  useGetPublicInspectionsForDoor,
+} from "../hooks/useQueries";
 
 interface DoorStatusPageProps {
   doorId: bigint;
@@ -70,9 +73,9 @@ export function DoorStatusPage({
   isLoggingIn,
 }: DoorStatusPageProps) {
   const { isFetching: actorFetching } = useActor();
-  const { data: door, isLoading: doorLoading } = useGetDoor(doorId);
-  const { data: inspections, isLoading: inspLoading } =
-    useGetInspectionsForDoor(doorId);
+  const { data: door, isLoading: doorLoading } = useGetPublicDoor(doorId);
+  const { data: inspections = [], isLoading: inspLoading } =
+    useGetPublicInspectionsForDoor(doorId);
 
   const latestInspection =
     [...inspections].sort((a, b) =>

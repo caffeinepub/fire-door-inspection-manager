@@ -290,6 +290,20 @@ actor {
     };
     doors.size();
   };
+
+  // Public functions for QR code status page (no authentication required)
+  public query func getPublicDoor(doorId : DoorId) : async ?Door.Door {
+    doors.get(doorId);
+  };
+
+  public query func getPublicInspectionsForDoor(doorId : DoorId) : async [Inspection.Inspection] {
+    let inspectionIds = switch (doorInspections.get(doorId)) {
+      case (null) { List.empty<InspectionId>() };
+      case (?list) { list };
+    };
+    inspectionIds.map<InspectionId, ?Inspection.Inspection>(func(id) { inspections.get(id) }).filterMap<?Inspection.Inspection, Inspection.Inspection>(func(opt) { opt }).toArray();
+  };
+
   public type Door = Door.Door;
   public type Inspection = Inspection.Inspection;
 };

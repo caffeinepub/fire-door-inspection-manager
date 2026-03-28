@@ -97,6 +97,8 @@ export interface _SERVICE {
   'getInspection' : ActorMethod<[InspectionId], Inspection>,
   'getInspectionsForDoor' : ActorMethod<[DoorId], Array<Inspection>>,
   'getUserProfile' : ActorMethod<[Principal], [] | [UserProfile]>,
+  'getPublicDoor' : ActorMethod<[DoorId], [] | [Door]>,
+  'getPublicInspectionsForDoor' : ActorMethod<[DoorId], Array<Inspection>>,
   'isCallerAdmin' : ActorMethod<[], boolean>,
   'saveCallerUserProfile' : ActorMethod<[UserProfile], undefined>,
 }

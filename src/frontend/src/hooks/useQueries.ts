@@ -187,3 +187,36 @@ export function useSaveProfile() {
     },
   });
 }
+
+export function useGetPublicDoor(doorId: bigint | null) {
+  const { actor, isFetching: actorFetching } = useActor();
+  const query = useQuery<Door | null>({
+    queryKey: ["publicDoor", doorId?.toString()],
+    queryFn: async () => {
+      if (!actor || doorId === null) return null;
+      return actor.getPublicDoor(doorId);
+    },
+    enabled: !!actor && !actorFetching && doorId !== null,
+  });
+  return {
+    ...query,
+    isLoading: actorFetching || query.isLoading,
+  };
+}
+
+export function useGetPublicInspectionsForDoor(doorId: bigint | null) {
+  const { actor, isFetching: actorFetching } = useActor();
+  const query = useQuery<Inspection[]>({
+    queryKey: ["publicInspections", doorId?.toString()],
+    queryFn: async () => {
+      if (!actor || doorId === null) return [];
+      return actor.getPublicInspectionsForDoor(doorId);
+    },
+    enabled: !!actor && !actorFetching && doorId !== null,
+  });
+  return {
+    ...query,
+    isLoading: actorFetching || query.isLoading,
+    data: query.data ?? [],
+  };
+}
