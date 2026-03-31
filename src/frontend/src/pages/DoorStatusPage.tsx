@@ -6,7 +6,6 @@ import {
   Building2,
   Calendar,
   CheckCircle2,
-  Flame,
   MapPin,
   XCircle,
 } from "lucide-react";
@@ -150,8 +149,12 @@ export function DoorStatusPage({
       {/* Header */}
       <header className="bg-fire-red text-white shadow-md">
         <div className="max-w-lg mx-auto px-4 h-14 flex items-center gap-2.5">
-          <Flame className="w-5 h-5" />
-          <span className="font-bold text-lg">Fire Door Inspector</span>
+          <img
+            src="/assets/screenshot_2026-03-27_at_16.18.34-019d4309-6f13-7322-af88-702e125e6e33.png"
+            alt="HSF Compliance"
+            className="h-8 w-auto bg-white rounded p-0.5 shrink-0"
+          />
+          <span className="font-bold text-lg">HSF Compliance Fire</span>
         </div>
       </header>
 

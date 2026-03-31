@@ -1,53 +1,34 @@
-# Fire Door Inspection Manager
+# HSF Compliance Fire - Door Inspection Software
 
 ## Current State
 
-The app has:
-- Full door management (CRUD) with company, building, floor, location, dimensions, materials, fire rating
-- Inspection management with 14-item checklist and overall status
-- Per-inspection PDF report page (`InspectionReportPage.tsx`) opened via "Report" button in Door Detail
-- Door Detail page showing inspection history, QR code, door info
-- By Company inspection wizard (`CompanyInspectionWizard.tsx`)
-- Blob storage client (`StorageClient.ts`) already present in the codebase
-- `blob-storage` component available but NOT currently selected/wired into the backend
-- Backend has no attachment storage or retrieval functions
-- `backendInterface` has no attachment-related methods
+The app is a full fire door inspection management system. The app name throughout the UI reads "Fire Door Inspector" or "Fire Door Inspection Manager". There is no company logo displayed anywhere. The logo file has been uploaded by the user and is already present at `src/frontend/public/assets/screenshot_2026-03-27_at_16.18.34-019d4309-6f13-7322-af88-702e125e6e33.png`.
 
 ## Requested Changes (Diff)
 
 ### Add
-1. **Company Inspection Summary PDF** — A new print-ready page/view (`CompanyReportPage.tsx`) that shows all doors for a selected company and their latest inspection result (status, date, inspector, checklist pass/fail summary). Accessible via a "Export Company Report" button from the Inspect page (By Company tab) and possibly a Reports nav item. Uses the same browser print-to-PDF pattern as `InspectionReportPage`.
-
-2. **Fire Door Certification Data Sheet Attachment** — An "Attachments" section on the Door Detail page (`DoorDetailPage.tsx`) allowing:
-   - Upload a PDF or image file (Fire Door Certification Data Sheet)
-   - Display the uploaded file name with a download/view link
-   - Remove an attachment
-   - Multiple attachments per door supported
-   - Uses `blob-storage` component + `StorageClient`
-
-3. **Backend: Attachment storage** — New Motoko types and functions:
-   - `DoorAttachment` type: `{ id: Nat; doorId: DoorId; filename: Text; blobHash: Text; uploadedAt: Time.Time }`
-   - `doorAttachments` stable map: `DoorId -> List<DoorAttachment>`
-   - `addDoorAttachment(doorId, filename, blobHash)` — authenticated
-   - `getDoorAttachments(doorId)` — authenticated
-   - `removeDoorAttachment(doorId, attachmentId)` — authenticated
+- HSF Compliance logo image displayed in all headers (main app header, login screen header, public QR status page header)
+- Logo also appears in report headers (InspectionReportPage, CompanyReportPage)
 
 ### Modify
-- `DoorDetailPage.tsx` — Add "Attachments" card section below inspection history
-- `App.tsx` — Add navigation to `CompanyReportPage` if needed; add "company-report" page type
-- `useQueries.ts` — Add hooks for attachment operations (useGetDoorAttachments, useAddDoorAttachment, useRemoveDoorAttachment)
-- `InspectionReportPage.tsx` — already has nav blue, no change needed unless company report shares components
+- App name changed everywhere from "Fire Door Inspector" / "Fire Door Inspection Manager" to "HSF Compliance Fire - Door Inspection Software"
+- `index.html` `<title>` updated to "HSF Compliance Fire - Door Inspection Software"
+- Main header in `App.tsx`: replace Flame icon + "Fire Door Inspector" text with logo image + abbreviated name
+- Login screen in `App.tsx`: replace icon + "Fire Door Inspector" title with logo + full name
+- Public status page header in `DoorStatusPage.tsx`: replace Flame icon + "Fire Door Inspector" with logo + name
+- Footer text in `InspectionReportPage.tsx` and `CompanyReportPage.tsx`: update from "Fire Door Inspection Manager" to "HSF Compliance Fire - Door Inspection Software"
+- Report header title can remain "Fire Door Inspection Report" but company branding should show HSF logo
 
 ### Remove
-- Nothing removed
+- Flame icon from all headers (replaced by logo)
 
 ## Implementation Plan
 
-1. Select `blob-storage` Caffeine component
-2. Generate updated Motoko backend with attachment types and functions (keeping all existing door/inspection code intact)
-3. Frontend:
-   a. Add `CompanyReportPage.tsx` — print-ready page with company header, table of all doors with latest inspection status, summary stats, print button
-   b. Add attachment hooks in `useQueries.ts` — `useGetDoorAttachments`, `useAddDoorAttachment`, `useRemoveDoorAttachment`
-   c. Update `DoorDetailPage.tsx` — add Attachments card section with file upload (using StorageClient), file list with view/delete
-   d. Update `App.tsx` — add `company-report` page type, wire up `CompanyReportPage`, add "Export Report" button in inspect flow
-   e. Wire `StorageClient` in attachment upload using the existing pattern from the storage utils
+1. Update `src/frontend/index.html` title
+2. In `App.tsx`:
+   - Main header: swap Flame icon + span for `<img>` of logo (with white bg pill for contrast against navy header) + "HSF Compliance Fire" text (full on desktop, abbreviated on mobile)
+   - Login screen: replace icon+title block with logo image + full app name below
+   - Status page mini-header (inside App.tsx for authenticated state): same logo treatment
+3. In `DoorStatusPage.tsx`: replace Flame icon + text in header with logo + name
+4. In `InspectionReportPage.tsx`: update footer "Fire Door Inspection Manager" to "HSF Compliance Fire - Door Inspection Software"; add small logo to report header
+5. In `CompanyReportPage.tsx`: same footer and header logo updates

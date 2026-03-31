@@ -202,12 +202,17 @@ export function InspectionReportPage({
         {/* Header bar */}
         <div className="bg-fire-red text-white px-6 py-5">
           <div className="flex flex-wrap items-start justify-between gap-3">
-            <div>
+            <div className="flex items-center gap-3 mb-1">
+              <img
+                src="/assets/screenshot_2026-03-27_at_16.18.34-019d4309-6f13-7322-af88-702e125e6e33.png"
+                alt="HSF Compliance"
+                className="h-10 w-auto bg-white rounded p-0.5 shrink-0"
+              />
               <h1 className="text-xl font-bold tracking-tight">
                 Fire Door Inspection Report
               </h1>
-              <p className="text-white/80 text-sm mt-0.5">{door.company}</p>
             </div>
+            <p className="text-white/80 text-sm mt-0.5">{door.company}</p>
             <div className="text-right text-sm text-white/80">
               <p>Date Printed</p>
               <p className="font-semibold text-white">{today}</p>
@@ -318,7 +323,7 @@ export function InspectionReportPage({
         {/* Footer */}
         <div className="px-6 py-3 bg-muted/30 border-t border-border text-xs text-muted-foreground flex flex-wrap justify-between gap-2">
           <span>Report generated on {today}</span>
-          <span>Fire Door Inspection Manager</span>
+          <span>HSF Compliance Fire - Door Inspection Software</span>
         </div>
       </div>
     </div>

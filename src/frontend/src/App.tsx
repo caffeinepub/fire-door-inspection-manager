@@ -5,7 +5,6 @@ import { useQueryClient } from "@tanstack/react-query";
 import {
   ClipboardList,
   DoorOpen,
-  Flame,
   LayoutDashboard,
   Loader2,
   LogIn,
@@ -306,8 +305,12 @@ export default function App() {
           <header className="bg-fire-red text-white shadow-md">
             <div className="max-w-lg mx-auto px-4 h-14 flex items-center justify-between">
               <div className="flex items-center gap-2.5">
-                <Flame className="w-5 h-5" />
-                <span className="font-bold text-lg">Fire Door Inspector</span>
+                <img
+                  src="/assets/screenshot_2026-03-27_at_16.18.34-019d4309-6f13-7322-af88-702e125e6e33.png"
+                  alt="HSF Compliance"
+                  className="h-8 w-auto bg-white rounded p-0.5 shrink-0"
+                />
+                <span className="font-bold text-lg">HSF Compliance Fire</span>
               </div>
               <Button
                 variant="ghost"
@@ -358,12 +361,18 @@ export default function App() {
     return (
       <div className="min-h-screen bg-background flex flex-col items-center justify-center p-6">
         <div className="bg-card rounded-2xl shadow-card-hover p-10 max-w-sm w-full text-center space-y-6">
-          <div className="flex items-center justify-center gap-2.5 mb-2">
-            <div className="w-12 h-12 rounded-xl bg-fire-red flex items-center justify-center">
-              <Flame className="w-6 h-6 text-white" />
-            </div>
-            <h1 className="text-2xl font-bold text-foreground">
-              Fire Door Inspector
+          <div className="flex flex-col items-center gap-3 mb-2">
+            <img
+              src="/assets/screenshot_2026-03-27_at_16.18.34-019d4309-6f13-7322-af88-702e125e6e33.png"
+              alt="HSF Compliance"
+              className="h-16 w-auto"
+            />
+            <h1 className="text-xl font-bold text-foreground leading-tight text-center">
+              HSF Compliance Fire
+              <br />
+              <span className="text-base font-medium text-muted-foreground">
+                Door Inspection Software
+              </span>
             </h1>
           </div>
           <p className="text-muted-foreground text-sm">
@@ -421,8 +430,15 @@ export default function App() {
               onClick={() => navigate("dashboard")}
               className="flex items-center gap-2 font-bold text-lg tracking-tight"
             >
-              <Flame className="w-5 h-5" />
-              <span>Fire Door Inspector</span>
+              <img
+                src="/assets/screenshot_2026-03-27_at_16.18.34-019d4309-6f13-7322-af88-702e125e6e33.png"
+                alt="HSF Compliance"
+                className="h-8 w-auto bg-white rounded p-0.5 shrink-0"
+              />
+              <span className="hidden sm:inline font-bold text-base leading-tight">
+                HSF Compliance Fire
+              </span>
+              <span className="sm:hidden font-bold text-base">HSF</span>
             </button>
             {/* Desktop nav */}
             <nav className="hidden md:flex items-center gap-1">
