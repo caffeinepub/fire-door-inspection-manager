@@ -109,6 +109,7 @@ export interface Door {
     createdAt: Time;
     building: string;
     company: string;
+    dimensions: string;
     leafConfig: LeafConfig;
     doorType: DoorType;
     notes: string;
@@ -504,6 +505,7 @@ function from_candid_record_n21(_uploadFile: (file: ExternalBlob) => Promise<Uin
     createdAt: _Time;
     building: string;
     company: string;
+    dimensions: string;
     leafConfig: _LeafConfig;
     doorType: _DoorType;
     notes: string;
@@ -518,6 +520,7 @@ function from_candid_record_n21(_uploadFile: (file: ExternalBlob) => Promise<Uin
     createdAt: Time;
     building: string;
     company: string;
+    dimensions: string;
     leafConfig: LeafConfig;
     doorType: DoorType;
     notes: string;
@@ -533,6 +536,7 @@ function from_candid_record_n21(_uploadFile: (file: ExternalBlob) => Promise<Uin
         createdAt: value.createdAt,
         building: value.building,
         company: value.company,
+        dimensions: value.dimensions,
         leafConfig: from_candid_LeafConfig_n22(_uploadFile, _downloadFile, value.leafConfig),
         doorType: from_candid_DoorType_n24(_uploadFile, _downloadFile, value.doorType),
         notes: value.notes,
@@ -719,6 +723,7 @@ function to_candid_record_n2(_uploadFile: (file: ExternalBlob) => Promise<Uint8A
     createdAt: Time;
     building: string;
     company: string;
+    dimensions: string;
     leafConfig: LeafConfig;
     doorType: DoorType;
     notes: string;
@@ -733,6 +738,7 @@ function to_candid_record_n2(_uploadFile: (file: ExternalBlob) => Promise<Uint8A
     createdAt: _Time;
     building: string;
     company: string;
+    dimensions: string;
     leafConfig: _LeafConfig;
     doorType: _DoorType;
     notes: string;
@@ -748,6 +754,7 @@ function to_candid_record_n2(_uploadFile: (file: ExternalBlob) => Promise<Uint8A
         createdAt: value.createdAt,
         building: value.building,
         company: value.company,
+        dimensions: value.dimensions,
         leafConfig: to_candid_LeafConfig_n3(_uploadFile, _downloadFile, value.leafConfig),
         doorType: to_candid_DoorType_n5(_uploadFile, _downloadFile, value.doorType),
         notes: value.notes,

@@ -8,107 +8,109 @@ import type {
 } from "../backend";
 import { useActor } from "./useActor";
 
+// Attachment types (pending backend regeneration)
+export type AttachmentId = bigint;
+export interface DoorAttachment {
+  id: AttachmentId;
+  doorId: DoorId;
+  filename: string;
+  blobHash: string;
+  uploadedAt: bigint;
+}
+
 export function useGetAllDoors() {
-  const { actor, isFetching } = useActor();
+  const { actor } = useActor();
   return useQuery<Door[]>({
     queryKey: ["doors"],
     queryFn: async () => {
       if (!actor) return [];
       return actor.getAllDoors();
     },
-    enabled: !!actor && !isFetching,
+    enabled: !!actor,
     refetchOnMount: "always",
   });
 }
 
 export function useGetDoorCount() {
-  const { actor, isFetching } = useActor();
+  const { actor } = useActor();
   return useQuery<bigint>({
     queryKey: ["doorCount"],
     queryFn: async () => {
       if (!actor) return BigInt(0);
       return actor.getDoorCount();
     },
-    enabled: !!actor && !isFetching,
+    enabled: !!actor,
   });
 }
 
 export function useGetDoor(doorId: DoorId | null) {
-  const { actor, isFetching: actorFetching } = useActor();
+  const { actor } = useActor();
   const query = useQuery<Door | null>({
     queryKey: ["door", doorId?.toString()],
     queryFn: async () => {
       if (!actor || doorId === null) return null;
       return actor.getDoor(doorId);
     },
-    enabled: !!actor && !actorFetching && doorId !== null,
+    enabled: !!actor && doorId !== null,
   });
-  return {
-    ...query,
-    isLoading: actorFetching || query.isLoading,
-  };
+  return query;
 }
 
 export function useGetInspection(id: InspectionId | null) {
-  const { actor, isFetching: actorFetching } = useActor();
+  const { actor } = useActor();
   const query = useQuery<Inspection | null>({
     queryKey: ["inspection", id?.toString()],
     queryFn: async () => {
       if (!actor || id === null) return null;
       return actor.getInspection(id);
     },
-    enabled: !!actor && !actorFetching && id !== null,
+    enabled: !!actor && id !== null,
   });
-  return {
-    ...query,
-    isLoading: actorFetching || query.isLoading,
-  };
+  return query;
 }
 
 export function useGetInspectionsForDoor(doorId: DoorId | null) {
-  const { actor, isFetching: actorFetching } = useActor();
+  const { actor } = useActor();
   const query = useQuery<Inspection[]>({
     queryKey: ["inspections", doorId?.toString()],
     queryFn: async () => {
       if (!actor || doorId === null) return [];
       return actor.getInspectionsForDoor(doorId);
     },
-    enabled: !!actor && !actorFetching && doorId !== null,
+    enabled: !!actor && doorId !== null,
   });
   return {
     ...query,
-    isLoading: actorFetching || query.isLoading,
     data: query.data ?? [],
   };
 }
 
 export function useGetCallerUserProfile() {
-  const { actor, isFetching: actorFetching } = useActor();
+  const { actor } = useActor();
   const query = useQuery<UserProfile | null>({
     queryKey: ["currentUserProfile"],
     queryFn: async () => {
       if (!actor) throw new Error("Actor not available");
       return actor.getCallerUserProfile();
     },
-    enabled: !!actor && !actorFetching,
+    enabled: !!actor,
     retry: false,
   });
   return {
     ...query,
-    isLoading: actorFetching || query.isLoading,
     isFetched: !!actor && query.isFetched,
   };
 }
 
 export function useIsCallerAdmin() {
-  const { actor, isFetching } = useActor();
+  const { actor } = useActor();
   return useQuery<boolean>({
     queryKey: ["isAdmin"],
     queryFn: async () => {
       if (!actor) return false;
       return actor.isCallerAdmin();
     },
-    enabled: !!actor && !isFetching,
+    enabled: !!actor,
   });
 }
 
@@ -189,34 +191,97 @@ export function useSaveProfile() {
 }
 
 export function useGetPublicDoor(doorId: bigint | null) {
-  const { actor, isFetching: actorFetching } = useActor();
+  const { actor } = useActor();
   const query = useQuery<Door | null>({
     queryKey: ["publicDoor", doorId?.toString()],
     queryFn: async () => {
       if (!actor || doorId === null) return null;
       return actor.getPublicDoor(doorId);
     },
-    enabled: !!actor && !actorFetching && doorId !== null,
+    enabled: !!actor && doorId !== null,
   });
-  return {
-    ...query,
-    isLoading: actorFetching || query.isLoading,
-  };
+  return query;
 }
 
 export function useGetPublicInspectionsForDoor(doorId: bigint | null) {
-  const { actor, isFetching: actorFetching } = useActor();
+  const { actor } = useActor();
   const query = useQuery<Inspection[]>({
     queryKey: ["publicInspections", doorId?.toString()],
     queryFn: async () => {
       if (!actor || doorId === null) return [];
       return actor.getPublicInspectionsForDoor(doorId);
     },
-    enabled: !!actor && !actorFetching && doorId !== null,
+    enabled: !!actor && doorId !== null,
   });
   return {
     ...query,
-    isLoading: actorFetching || query.isLoading,
     data: query.data ?? [],
   };
+}
+
+export function useGetDoorAttachments(doorId: DoorId | null) {
+  const { actor } = useActor();
+  return useQuery<DoorAttachment[]>({
+    queryKey: ["doorAttachments", doorId?.toString()],
+    queryFn: async () => {
+      if (!actor || doorId === null) return [];
+      return (actor as any).getDoorAttachments(doorId) as Promise<
+        DoorAttachment[]
+      >;
+    },
+    enabled: !!actor && doorId !== null,
+  });
+}
+
+export function useAddDoorAttachment() {
+  const { actor } = useActor();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({
+      doorId,
+      filename,
+      blobHash,
+    }: {
+      doorId: DoorId;
+      filename: string;
+      blobHash: string;
+    }) => {
+      if (!actor) throw new Error("Actor not available");
+      return (actor as any).addDoorAttachment(
+        doorId,
+        filename,
+        blobHash,
+      ) as Promise<AttachmentId>;
+    },
+    onSuccess: (_, { doorId }) => {
+      qc.invalidateQueries({
+        queryKey: ["doorAttachments", doorId.toString()],
+      });
+    },
+  });
+}
+
+export function useRemoveDoorAttachment() {
+  const { actor } = useActor();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({
+      doorId,
+      attachmentId,
+    }: {
+      doorId: DoorId;
+      attachmentId: AttachmentId;
+    }) => {
+      if (!actor) throw new Error("Actor not available");
+      return (actor as any).removeDoorAttachment(
+        doorId,
+        attachmentId,
+      ) as Promise<void>;
+    },
+    onSuccess: (_, { doorId }) => {
+      qc.invalidateQueries({
+        queryKey: ["doorAttachments", doorId.toString()],
+      });
+    },
+  });
 }

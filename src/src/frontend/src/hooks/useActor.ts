@@ -7,7 +7,7 @@ import { useInternetIdentity } from "./useInternetIdentity";
 
 const ACTOR_QUERY_KEY = "actor";
 
-// Module-level cache so the actor survives React Query GC (default 5min)
+// Module-level cache so the actor survives React Query GC
 let _cachedActor: backendInterface | null = null;
 let _cachedIdentityKey: string | null = null;
 
@@ -15,6 +15,10 @@ export function useActor() {
   const { identity } = useInternetIdentity();
   const queryClient = useQueryClient();
   const identityKey = identity?.getPrincipal().toString() ?? "anonymous";
+
+  // Track the last identity key we invalidated queries for, so we only
+  // invalidate when the user actually logs in/out — not on every background refetch.
+  const lastInvalidatedIdentityKey = useRef<string | null>(null);
 
   const actorQuery = useQuery<backendInterface>({
     queryKey: [ACTOR_QUERY_KEY, identityKey],
@@ -51,21 +55,20 @@ export function useActor() {
         : undefined,
   });
 
-  // When the actor changes, invalidate dependent queries
+  // Only invalidate/refetch other queries when the identity actually changes
+  // (i.e. user logs in or logs out). Ignore background refetches that return
+  // the same cached actor — they were the source of the recurring buffering.
   useEffect(() => {
-    if (actorQuery.data) {
+    if (actorQuery.data && lastInvalidatedIdentityKey.current !== identityKey) {
+      lastInvalidatedIdentityKey.current = identityKey;
       queryClient.invalidateQueries({
-        predicate: (query) => {
-          return !query.queryKey.includes(ACTOR_QUERY_KEY);
-        },
+        predicate: (query) => !query.queryKey.includes(ACTOR_QUERY_KEY),
       });
       queryClient.refetchQueries({
-        predicate: (query) => {
-          return !query.queryKey.includes(ACTOR_QUERY_KEY);
-        },
+        predicate: (query) => !query.queryKey.includes(ACTOR_QUERY_KEY),
       });
     }
-  }, [actorQuery.data, queryClient]);
+  }, [actorQuery.data, identityKey, queryClient]);
 
   // Prefer live query data, fall back to module-level cache
   const actor =

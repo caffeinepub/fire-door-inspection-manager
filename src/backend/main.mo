@@ -10,12 +10,15 @@ import Runtime "mo:core/Runtime";
 import Text "mo:core/Text";
 import AccessControl "authorization/access-control";
 import MixinAuthorization "authorization/MixinAuthorization";
+import BlobStorageMixin "blob-storage/Mixin";
 
 
 
 actor {
   type DoorId = Nat;
   type InspectionId = Nat;
+  type AttachmentId = Nat;
+
   module Door {
     public type DoorMaterial = {
       #timber;
@@ -51,7 +54,26 @@ actor {
       #oneHundredTwentyMinutes;
     };
 
+    // Current door type (with dimensions)
     public type Door = {
+      id : DoorId;
+      company : Text;
+      building : Text;
+      floor : Text;
+      location : Text;
+      dimensions : Text;
+      doorMaterial : DoorMaterial;
+      frameMaterial : FrameMaterial;
+      doorType : DoorType;
+      leafConfig : LeafConfig;
+      fireRating : FireRating;
+      notes : Text;
+      createdAt : Time.Time;
+      active : Bool;
+    };
+
+    // Legacy door type (without dimensions) — used for migration
+    public type LegacyDoor = {
       id : DoorId;
       company : Text;
       building : Text;
@@ -107,20 +129,65 @@ actor {
       createdAt : Time.Time;
     };
   };
+
+  public type DoorAttachment = {
+    id : AttachmentId;
+    doorId : DoorId;
+    filename : Text;
+    blobHash : Text;
+    uploadedAt : Time.Time;
+  };
+
   public type UserProfile = {
     name : Text;
   };
 
   var nextDoorId = 1;
   var nextInspectionId = 1;
+  var nextAttachmentId = 1;
 
-  let doors = Map.empty<DoorId, Door.Door>();
+  // Legacy stable variable — receives the old on-chain 'doors' data (no dimensions field).
+  // Must keep this name so Motoko maps the existing state into it on upgrade.
+  let doors = Map.empty<DoorId, Door.LegacyDoor>();
+
+  // New stable variable — holds Door records with the dimensions field.
+  let doorsV2 = Map.empty<DoorId, Door.Door>();
+
   let inspections = Map.empty<InspectionId, Inspection.Inspection>();
   let doorInspections = Map.empty<DoorId, List.List<InspectionId>>();
   let userProfiles = Map.empty<Principal, UserProfile>();
 
+  // Attachment storage
+  let doorAttachmentMap = Map.empty<DoorId, List.List<DoorAttachment>>();
+
   let accessControlState = AccessControl.initState();
   include MixinAuthorization(accessControlState);
+  include BlobStorageMixin();
+
+  // Migration: runs once after upgrade to copy legacy doors into doorsV2.
+  system func postupgrade() {
+    if (doorsV2.size() == 0) {
+      for (legacyDoor in doors.values()) {
+        let newDoor : Door.Door = {
+          id = legacyDoor.id;
+          company = legacyDoor.company;
+          building = legacyDoor.building;
+          floor = legacyDoor.floor;
+          location = legacyDoor.location;
+          dimensions = "";
+          doorMaterial = legacyDoor.doorMaterial;
+          frameMaterial = legacyDoor.frameMaterial;
+          doorType = legacyDoor.doorType;
+          leafConfig = legacyDoor.leafConfig;
+          fireRating = legacyDoor.fireRating;
+          notes = legacyDoor.notes;
+          createdAt = legacyDoor.createdAt;
+          active = legacyDoor.active;
+        };
+        doorsV2.add(newDoor.id, newDoor);
+      };
+    };
+  };
 
   // User Profile Management
   public query ({ caller }) func getCallerUserProfile() : async ?UserProfile {
@@ -160,7 +227,7 @@ actor {
       createdAt = Time.now();
       active = true;
     };
-    doors.add(doorId, newDoor);
+    doorsV2.add(doorId, newDoor);
     doorId;
   };
 
@@ -171,7 +238,7 @@ actor {
     if (door.company == "") {
       Runtime.trap("Company name cannot be empty");
     };
-    switch (doors.get(doorId)) {
+    switch (doorsV2.get(doorId)) {
       case (null) { Runtime.trap("Door not found"); };
       case (?existingDoor) {
         let updatedDoor : Door.Door = {
@@ -180,6 +247,7 @@ actor {
           building = door.building;
           floor = door.floor;
           location = door.location;
+          dimensions = door.dimensions;
           doorMaterial = door.doorMaterial;
           frameMaterial = door.frameMaterial;
           doorType = door.doorType;
@@ -187,7 +255,7 @@ actor {
           fireRating = door.fireRating;
           notes = door.notes;
         };
-        doors.add(doorId, updatedDoor);
+        doorsV2.add(doorId, updatedDoor);
       };
     };
   };
@@ -196,13 +264,13 @@ actor {
     if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
       Runtime.trap("Unauthorized: You must be logged in to delete doors");
     };
-    switch (doors.get(doorId)) {
+    switch (doorsV2.get(doorId)) {
       case (null) { Runtime.trap("Door not found"); };
       case (?existingDoor) {
         let updatedDoor : Door.Door = {
           existingDoor with active = false;
         };
-        doors.add(doorId, updatedDoor);
+        doorsV2.add(doorId, updatedDoor);
       };
     };
   };
@@ -218,7 +286,7 @@ actor {
     if (inspection.company == "") {
       Runtime.trap("Company name cannot be empty");
     };
-    if (not doors.containsKey(inspection.doorId)) {
+    if (not doorsV2.containsKey(inspection.doorId)) {
       Runtime.trap("Door not found");
     };
     let inspectionId = nextInspectionId;
@@ -238,12 +306,63 @@ actor {
     inspectionId;
   };
 
+  // Attachment Management (Authenticated users)
+  public shared ({ caller }) func addDoorAttachment(doorId : DoorId, filename : Text, blobHash : Text) : async AttachmentId {
+    if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
+      Runtime.trap("Unauthorized: You must be logged in to add attachments");
+    };
+    if (not doorsV2.containsKey(doorId)) {
+      Runtime.trap("Door not found");
+    };
+    let attachmentId = nextAttachmentId;
+    nextAttachmentId += 1;
+    let attachment : DoorAttachment = {
+      id = attachmentId;
+      doorId = doorId;
+      filename = filename;
+      blobHash = blobHash;
+      uploadedAt = Time.now();
+    };
+    let currentAttachments = switch (doorAttachmentMap.get(doorId)) {
+      case (null) { List.empty<DoorAttachment>() };
+      case (?existingList) { existingList };
+    };
+    currentAttachments.add(attachment);
+    doorAttachmentMap.add(doorId, currentAttachments);
+    attachmentId;
+  };
+
+  public query ({ caller }) func getDoorAttachments(doorId : DoorId) : async [DoorAttachment] {
+    if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
+      Runtime.trap("Unauthorized: Only users can view attachments");
+    };
+    let attachmentList = switch (doorAttachmentMap.get(doorId)) {
+      case (null) { List.empty<DoorAttachment>() };
+      case (?list) { list };
+    };
+    attachmentList.toArray();
+  };
+
+  public shared ({ caller }) func removeDoorAttachment(doorId : DoorId, attachmentId : AttachmentId) : async () {
+    if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
+      Runtime.trap("Unauthorized: You must be logged in to remove attachments");
+    };
+    let currentAttachments = switch (doorAttachmentMap.get(doorId)) {
+      case (null) { return };
+      case (?list) { list };
+    };
+    let filtered = currentAttachments.filter(func(a : DoorAttachment) : Bool {
+      a.id != attachmentId
+    });
+    doorAttachmentMap.add(doorId, filtered);
+  };
+
   // Public Query Functions
   public query ({ caller }) func getAllDoors() : async [Door.Door] {
     if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
       Runtime.trap("Unauthorized: Only users can view doors");
     };
-    doors.values().filter(func(d : Door.Door) : Bool { d.active }).toArray().sort();
+    doorsV2.values().filter(func(d : Door.Door) : Bool { d.active }).toArray().sort();
   };
 
   public query ({ caller }) func getInspectionsForDoor(doorId : DoorId) : async [Inspection.Inspection] {
@@ -268,7 +387,7 @@ actor {
     if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
       Runtime.trap("Unauthorized: Only users can view doors");
     };
-    switch (doors.get(doorId)) {
+    switch (doorsV2.get(doorId)) {
       case (null) { Runtime.trap("Door not found") };
       case (?door) { door };
     };
@@ -288,12 +407,12 @@ actor {
     if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
       Runtime.trap("Unauthorized: Only users can view door count");
     };
-    doors.size();
+    doorsV2.size();
   };
 
   // Public functions for QR code status page (no authentication required)
   public query func getPublicDoor(doorId : DoorId) : async ?Door.Door {
-    doors.get(doorId);
+    doorsV2.get(doorId);
   };
 
   public query func getPublicInspectionsForDoor(doorId : DoorId) : async [Inspection.Inspection] {

@@ -20,6 +20,8 @@ export interface Inspection {
     overallStatus: InspectionStatus;
 }
 export type DoorId = bigint;
+export type InspectionId = bigint;
+export type AttachmentId = bigint;
 export interface Door {
     id: DoorId;
     floor: string;
@@ -27,6 +29,7 @@ export interface Door {
     createdAt: Time;
     building: string;
     company: string;
+    dimensions: string;
     leafConfig: LeafConfig;
     doorType: DoorType;
     notes: string;
@@ -35,7 +38,13 @@ export interface Door {
     location: string;
     fireRating: FireRating;
 }
-export type InspectionId = bigint;
+export interface DoorAttachment {
+    id: AttachmentId;
+    doorId: DoorId;
+    filename: string;
+    blobHash: string;
+    uploadedAt: Time;
+}
 export interface Checklist {
     frame: boolean;
     glazing: boolean;
@@ -108,7 +117,13 @@ export interface backendInterface {
     getDoorCount(): Promise<bigint>;
     getInspection(inspectionId: InspectionId): Promise<Inspection>;
     getInspectionsForDoor(doorId: DoorId): Promise<Array<Inspection>>;
+    getPublicDoor(doorId: DoorId): Promise<Door | null>;
+    getPublicInspectionsForDoor(doorId: DoorId): Promise<Array<Inspection>>;
     getUserProfile(user: Principal): Promise<UserProfile | null>;
     isCallerAdmin(): Promise<boolean>;
     saveCallerUserProfile(profile: UserProfile): Promise<void>;
+    addDoorAttachment(doorId: DoorId, filename: string, blobHash: string): Promise<AttachmentId>;
+    getDoorAttachments(doorId: DoorId): Promise<Array<DoorAttachment>>;
+    removeDoorAttachment(doorId: DoorId, attachmentId: AttachmentId): Promise<void>;
+    _caffeineStorageCreateCertificate(hash: string): Promise<Uint8Array>;
 }

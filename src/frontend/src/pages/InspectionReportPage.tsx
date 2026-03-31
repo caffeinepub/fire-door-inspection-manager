@@ -135,6 +135,21 @@ export function InspectionReportPage({
     statusConfig[inspection.overallStatus] ??
     statusConfig[InspectionStatus.fail];
 
+  const doorReferenceFields: [string, string][] = [
+    ["Door ID", `#${door.id.toString().padStart(3, "0")}`],
+    ["Building", door.building],
+    ["Floor", door.floor],
+    ["Location", door.location],
+    ...(door.dimensions
+      ? [["Dimensions", door.dimensions] as [string, string]]
+      : []),
+    ["Door Type", door.doorType],
+    ["Leaf Configuration", door.leafConfig],
+    ["Door Material", door.doorMaterial],
+    ["Frame Material", door.frameMaterial],
+    ["Fire Rating", FIRE_RATING_LABELS[door.fireRating] ?? door.fireRating],
+  ];
+
   const renderChecklistCol = (entries: [string, boolean][]) =>
     entries.map(([key, val]) => (
       <div
@@ -207,20 +222,7 @@ export function InspectionReportPage({
               Door Reference
             </h2>
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-x-6 gap-y-3 text-sm">
-              {[
-                ["Door ID", `#${door.id.toString().padStart(3, "0")}`],
-                ["Building", door.building],
-                ["Floor", door.floor],
-                ["Location", door.location],
-                ["Door Type", door.doorType],
-                ["Leaf Configuration", door.leafConfig],
-                ["Door Material", door.doorMaterial],
-                ["Frame Material", door.frameMaterial],
-                [
-                  "Fire Rating",
-                  FIRE_RATING_LABELS[door.fireRating] ?? door.fireRating,
-                ],
-              ].map(([label, value]) => (
+              {doorReferenceFields.map(([label, value]) => (
                 <div key={label}>
                   <span className="block text-[10px] font-semibold uppercase tracking-wider text-muted-foreground mb-0.5">
                     {label}

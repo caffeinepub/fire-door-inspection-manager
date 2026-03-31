@@ -11,8 +11,8 @@ import {
   XCircle,
 } from "lucide-react";
 import { Loader2, LogIn } from "lucide-react";
+import type { Checklist } from "../backend.d";
 import { useActor } from "../hooks/useActor";
-import { useInternetIdentity } from "../hooks/useInternetIdentity";
 import {
   useGetPublicDoor,
   useGetPublicInspectionsForDoor,
@@ -30,6 +30,23 @@ const fireRatingLabel: Record<string, string> = {
   ninetyMinutes: "90 Minutes",
   oneHundredTwentyMinutes: "120 Minutes",
 };
+
+const checklistLabels: Array<{ key: keyof Checklist; label: string }> = [
+  { key: "frame", label: "Frame Condition" },
+  { key: "glazing", label: "Glazing" },
+  { key: "certificatePlate", label: "Certificate Plate" },
+  { key: "doorCloser", label: "Door Closer" },
+  { key: "threshold", label: "Threshold" },
+  { key: "signage", label: "Signage" },
+  { key: "hinges", label: "Hinges" },
+  { key: "latch", label: "Latch" },
+  { key: "seals", label: "Seals" },
+  { key: "intumescentStrip", label: "Intumescent Strip" },
+  { key: "doorLeaf", label: "Door Leaf" },
+  { key: "noObstructions", label: "No Obstructions" },
+  { key: "selfClosing", label: "Self Closing" },
+  { key: "visionPanel", label: "Vision Panel" },
+];
 
 function StatusDisplay({ status }: { status: string }) {
   if (status === "pass") {
@@ -67,15 +84,48 @@ function StatusDisplay({ status }: { status: string }) {
   return null;
 }
 
+function ChecklistSection({ checklist }: { checklist: Checklist }) {
+  const passed = checklistLabels.filter((item) => checklist[item.key]).length;
+  const total = checklistLabels.length;
+
+  return (
+    <div className="bg-card rounded-[10px] shadow-card p-5 space-y-3">
+      <div className="flex items-center justify-between">
+        <h2 className="font-semibold text-foreground">Inspection Checklist</h2>
+        <span className="text-xs text-muted-foreground">
+          {passed}/{total} passed
+        </span>
+      </div>
+      <div className="divide-y divide-border">
+        {checklistLabels.map(({ key, label }) => {
+          const ok = checklist[key];
+          return (
+            <div key={key} className="flex items-center justify-between py-1.5">
+              <span className="text-sm text-foreground">{label}</span>
+              {ok ? (
+                <CheckCircle2 className="w-4 h-4 text-green-600 shrink-0" />
+              ) : (
+                <XCircle className="w-4 h-4 text-red-500 shrink-0" />
+              )}
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 export function DoorStatusPage({
   doorId,
   onLogin,
   isLoggingIn,
 }: DoorStatusPageProps) {
-  const { isFetching: actorFetching } = useActor();
+  const { actor } = useActor();
   const { data: door, isLoading: doorLoading } = useGetPublicDoor(doorId);
   const { data: inspections = [], isLoading: inspLoading } =
     useGetPublicInspectionsForDoor(doorId);
+
+  const isLoading = !actor || doorLoading || inspLoading;
 
   const latestInspection =
     [...inspections].sort((a, b) =>
@@ -106,7 +156,7 @@ export function DoorStatusPage({
       </header>
 
       <main className="flex-1 max-w-lg mx-auto w-full px-4 py-8 space-y-5">
-        {doorLoading || inspLoading || actorFetching ? (
+        {isLoading ? (
           <div className="space-y-4">
             <Skeleton className="h-8 w-48" />
             <Skeleton className="h-48" />
@@ -192,6 +242,11 @@ export function DoorStatusPage({
                 </div>
               )}
             </div>
+
+            {/* Inspection checklist breakdown */}
+            {latestInspection && (
+              <ChecklistSection checklist={latestInspection.checklist} />
+            )}
 
             {/* Login prompt for inspectors */}
             <div className="bg-muted/50 rounded-[10px] border border-border p-5 text-center space-y-3">

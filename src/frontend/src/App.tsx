@@ -35,12 +35,16 @@ import {
   useGetInspectionsForDoor,
   useIsCallerAdmin,
 } from "./hooks/useQueries";
+import { CompanyReportPage } from "./pages/CompanyReportPage";
 import { Dashboard } from "./pages/Dashboard";
 import { DoorDetailPage } from "./pages/DoorDetailPage";
 import { DoorStatusPage } from "./pages/DoorStatusPage";
 import { DoorsPage } from "./pages/DoorsPage";
 import { InspectionForm } from "./pages/InspectionForm";
 import { InspectionReportPage } from "./pages/InspectionReportPage";
+import type { LastInspectionInfo } from "./types";
+
+export type { LastInspectionInfo };
 
 type Page =
   | "dashboard"
@@ -48,13 +52,8 @@ type Page =
   | "door-detail"
   | "inspect"
   | "status"
-  | "report";
-
-export interface LastInspectionInfo {
-  date: bigint;
-  status: InspectionStatus;
-  checklist: Checklist;
-}
+  | "report"
+  | "company-report";
 
 const SAMPLE_DOORS: Omit<Door, "id" | "createdAt">[] = [
   {
@@ -68,6 +67,7 @@ const SAMPLE_DOORS: Omit<Door, "id" | "createdAt">[] = [
     fireRating: FireRating.sixtyMinutes,
     leafConfig: LeafConfig.singleLeaf,
     notes: "Main public entrance, high traffic",
+    dimensions: "",
     active: true,
   },
   {
@@ -81,6 +81,7 @@ const SAMPLE_DOORS: Omit<Door, "id" | "createdAt">[] = [
     fireRating: FireRating.ninetyMinutes,
     leafConfig: LeafConfig.singleLeaf,
     notes: "",
+    dimensions: "",
     active: true,
   },
   {
@@ -94,6 +95,7 @@ const SAMPLE_DOORS: Omit<Door, "id" | "createdAt">[] = [
     fireRating: FireRating.sixtyMinutes,
     leafConfig: LeafConfig.doubleLeaf,
     notes: "Adjacent to kitchen area",
+    dimensions: "",
     active: true,
   },
   {
@@ -107,6 +109,7 @@ const SAMPLE_DOORS: Omit<Door, "id" | "createdAt">[] = [
     fireRating: FireRating.thirtyMinutes,
     leafConfig: LeafConfig.singleLeaf,
     notes: "",
+    dimensions: "",
     active: true,
   },
   {
@@ -120,6 +123,7 @@ const SAMPLE_DOORS: Omit<Door, "id" | "createdAt">[] = [
     fireRating: FireRating.oneHundredTwentyMinutes,
     leafConfig: LeafConfig.singleLeaf,
     notes: "High fire risk area",
+    dimensions: "",
     active: true,
   },
   {
@@ -133,6 +137,7 @@ const SAMPLE_DOORS: Omit<Door, "id" | "createdAt">[] = [
     fireRating: FireRating.sixtyMinutes,
     leafConfig: LeafConfig.singleLeaf,
     notes: "",
+    dimensions: "",
     active: true,
   },
   {
@@ -146,6 +151,7 @@ const SAMPLE_DOORS: Omit<Door, "id" | "createdAt">[] = [
     fireRating: FireRating.sixtyMinutes,
     leafConfig: LeafConfig.singleLeaf,
     notes: "Heavy duty industrial use",
+    dimensions: "",
     active: true,
   },
   {
@@ -159,6 +165,7 @@ const SAMPLE_DOORS: Omit<Door, "id" | "createdAt">[] = [
     fireRating: FireRating.ninetyMinutes,
     leafConfig: LeafConfig.singleLeaf,
     notes: "Critical infrastructure",
+    dimensions: "",
     active: true,
   },
 ];
@@ -185,6 +192,7 @@ export default function App() {
   const [activeInspectionId, setActiveInspectionId] = useState<bigint | null>(
     null,
   );
+  const [activeCompany, setActiveCompany] = useState<string | null>(null);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [seeded, setSeeded] = useState(false);
   const [allInspections, setAllInspections] = useState<Inspection[]>([]);
@@ -264,10 +272,11 @@ export default function App() {
   })();
 
   const navigate = useCallback(
-    (p: Page, doorId?: bigint, inspectionId?: bigint) => {
+    (p: Page, doorId?: bigint, inspectionId?: bigint, companyName?: string) => {
       setPage(p);
       setActiveDoorId(doorId ?? null);
       setActiveInspectionId(inspectionId ?? null);
+      setActiveCompany(companyName ?? null);
       setMobileMenuOpen(false);
     },
     [],
@@ -291,7 +300,6 @@ export default function App() {
 
   // Public status page — accessible without login
   if (page === "status" && activeDoorId !== null) {
-    // If user just logged in, redirect to inspect page for that door
     if (isAuthenticated) {
       return (
         <div className="min-h-screen bg-background flex flex-col">
@@ -382,7 +390,7 @@ export default function App() {
           </Button>
         </div>
         <footer className="mt-8 text-xs text-muted-foreground">
-          © {new Date().getFullYear()}. Built with ❤️ using{" "}
+          &copy; {new Date().getFullYear()}. Built with ❤️ using{" "}
           <a
             href={`https://caffeine.ai?utm_source=caffeine-footer&utm_medium=referral&utm_content=${encodeURIComponent(window.location.hostname)}`}
             target="_blank"
@@ -521,7 +529,8 @@ export default function App() {
             key={
               page +
               (activeDoorId?.toString() ?? "") +
-              (activeInspectionId?.toString() ?? "")
+              (activeInspectionId?.toString() ?? "") +
+              (activeCompany ?? "")
             }
             initial={{ opacity: 0, y: 8 }}
             animate={{ opacity: 1, y: 0 }}
@@ -548,6 +557,7 @@ export default function App() {
                 preselectedDoorId={activeDoorId}
                 inspectorName={userProfile?.name ?? ""}
                 onNavigate={navigate}
+                lastInspectionMap={lastInspectionMap}
               />
             )}
             {page === "report" &&
@@ -559,13 +569,21 @@ export default function App() {
                   onBack={() => navigate("door-detail", activeDoorId)}
                 />
               )}
+            {page === "company-report" && activeCompany !== null && (
+              <CompanyReportPage
+                company={activeCompany}
+                doors={doors.filter((d) => d.company === activeCompany)}
+                allInspections={allInspections}
+                onBack={() => navigate("inspect")}
+              />
+            )}
           </motion.div>
         )}
       </main>
 
       {/* Footer */}
       <footer className="no-print border-t border-border py-4 text-center text-xs text-muted-foreground">
-        © {new Date().getFullYear()}. Built with ❤️ using{" "}
+        &copy; {new Date().getFullYear()}. Built with ❤️ using{" "}
         <a
           href={`https://caffeine.ai?utm_source=caffeine-footer&utm_medium=referral&utm_content=${encodeURIComponent(window.location.hostname)}`}
           target="_blank"

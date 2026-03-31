@@ -18,12 +18,12 @@ import {
   XCircle,
 } from "lucide-react";
 import { useMemo, useState } from "react";
-import type { LastInspectionInfo } from "../App";
 import { type Door, InspectionStatus } from "../backend";
 import { QRCodeSVG } from "../components/QRCode";
 import { QRCodeDialog } from "../components/QRCodeDialog";
 import { StatusBadge } from "../components/StatusBadge";
 import { useGetAllDoors } from "../hooks/useQueries";
+import type { LastInspectionInfo } from "../types";
 
 type Page = "dashboard" | "doors" | "door-detail" | "inspect";
 

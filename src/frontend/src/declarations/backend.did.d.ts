@@ -33,6 +33,7 @@ export interface Door {
   'createdAt' : Time,
   'building' : string,
   'company' : string,
+  'dimensions' : string,
   'leafConfig' : LeafConfig,
   'doorType' : DoorType,
   'notes' : string,

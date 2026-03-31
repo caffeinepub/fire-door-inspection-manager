@@ -41,6 +41,7 @@ const defaultForm = {
   building: "",
   floor: "",
   location: "",
+  dimensions: "",
   doorType: DoorType.single,
   doorMaterial: DoorMaterial.timber,
   frameMaterial: FrameMaterial.metal,
@@ -63,6 +64,7 @@ export function DoorModal({ open, onClose, editDoor }: DoorModalProps) {
         building: editDoor.building,
         floor: editDoor.floor,
         location: editDoor.location,
+        dimensions: editDoor.dimensions ?? "",
         doorType: editDoor.doorType,
         doorMaterial: editDoor.doorMaterial,
         frameMaterial: editDoor.frameMaterial,
@@ -158,6 +160,15 @@ export function DoorModal({ open, onClose, editDoor }: DoorModalProps) {
               onChange={(e) => field("location", e.target.value)}
               placeholder="e.g. Main entrance, Stairwell A"
               data-ocid="door_modal.location.input"
+            />
+          </div>
+          <div className="space-y-1.5">
+            <Label>Dimensions</Label>
+            <Input
+              value={form.dimensions}
+              onChange={(e) => field("dimensions", e.target.value)}
+              placeholder="e.g. 900mm x 2100mm"
+              data-ocid="door_modal.dimensions.input"
             />
           </div>
           <div className="grid grid-cols-2 gap-4">

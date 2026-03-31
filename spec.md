@@ -1,24 +1,53 @@
 # Fire Door Inspection Manager
 
 ## Current State
-App has a DoorDetailPage showing door info and inspection history. There is no PDF/print report feature. The app uses React + Tailwind, with a navy/fire-red color scheme.
+
+The app has:
+- Full door management (CRUD) with company, building, floor, location, dimensions, materials, fire rating
+- Inspection management with 14-item checklist and overall status
+- Per-inspection PDF report page (`InspectionReportPage.tsx`) opened via "Report" button in Door Detail
+- Door Detail page showing inspection history, QR code, door info
+- By Company inspection wizard (`CompanyInspectionWizard.tsx`)
+- Blob storage client (`StorageClient.ts`) already present in the codebase
+- `blob-storage` component available but NOT currently selected/wired into the backend
+- Backend has no attachment storage or retrieval functions
+- `backendInterface` has no attachment-related methods
 
 ## Requested Changes (Diff)
 
 ### Add
-- `InspectionReportPage.tsx` — a dedicated print-optimized report page showing full inspection details for a single door (or all inspections for a door). Includes company header, door details table, checklist results with pass/fail per item, overall status, inspector name, date, and notes. Has a 'Print / Save as PDF' button and a 'Back' button (both hidden on print). Print CSS hides all UI chrome.
-- A 'Generate Report' button on DoorDetailPage (per inspection row, or a top-level button to report latest inspection).
-- Add `report` to the Page type in App.tsx and route to InspectionReportPage.
+1. **Company Inspection Summary PDF** — A new print-ready page/view (`CompanyReportPage.tsx`) that shows all doors for a selected company and their latest inspection result (status, date, inspector, checklist pass/fail summary). Accessible via a "Export Company Report" button from the Inspect page (By Company tab) and possibly a Reports nav item. Uses the same browser print-to-PDF pattern as `InspectionReportPage`.
+
+2. **Fire Door Certification Data Sheet Attachment** — An "Attachments" section on the Door Detail page (`DoorDetailPage.tsx`) allowing:
+   - Upload a PDF or image file (Fire Door Certification Data Sheet)
+   - Display the uploaded file name with a download/view link
+   - Remove an attachment
+   - Multiple attachments per door supported
+   - Uses `blob-storage` component + `StorageClient`
+
+3. **Backend: Attachment storage** — New Motoko types and functions:
+   - `DoorAttachment` type: `{ id: Nat; doorId: DoorId; filename: Text; blobHash: Text; uploadedAt: Time.Time }`
+   - `doorAttachments` stable map: `DoorId -> List<DoorAttachment>`
+   - `addDoorAttachment(doorId, filename, blobHash)` — authenticated
+   - `getDoorAttachments(doorId)` — authenticated
+   - `removeDoorAttachment(doorId, attachmentId)` — authenticated
 
 ### Modify
-- `App.tsx`: Add `report` page type, pass `activeInspectionId` state, render InspectionReportPage.
-- `DoorDetailPage.tsx`: Add a report button per inspection row (or a 'Print Report' button for latest).
+- `DoorDetailPage.tsx` — Add "Attachments" card section below inspection history
+- `App.tsx` — Add navigation to `CompanyReportPage` if needed; add "company-report" page type
+- `useQueries.ts` — Add hooks for attachment operations (useGetDoorAttachments, useAddDoorAttachment, useRemoveDoorAttachment)
+- `InspectionReportPage.tsx` — already has nav blue, no change needed unless company report shares components
 
 ### Remove
-- Nothing removed.
+- Nothing removed
 
 ## Implementation Plan
-1. Create `InspectionReportPage.tsx` with print-optimized layout: company name, door reference, all door fields, checklist table with tick/cross per item, overall status badge, inspector, date, notes, print button.
-2. Add `report` page and `activeInspectionId` to App.tsx state, render the new page.
-3. Add 'Print Report' buttons on DoorDetailPage inspection history rows.
-4. Add `@media print` CSS via inline styles or a style tag to hide nav/header/footer and show only report content.
+
+1. Select `blob-storage` Caffeine component
+2. Generate updated Motoko backend with attachment types and functions (keeping all existing door/inspection code intact)
+3. Frontend:
+   a. Add `CompanyReportPage.tsx` — print-ready page with company header, table of all doors with latest inspection status, summary stats, print button
+   b. Add attachment hooks in `useQueries.ts` — `useGetDoorAttachments`, `useAddDoorAttachment`, `useRemoveDoorAttachment`
+   c. Update `DoorDetailPage.tsx` — add Attachments card section with file upload (using StorageClient), file list with view/delete
+   d. Update `App.tsx` — add `company-report` page type, wire up `CompanyReportPage`, add "Export Report" button in inspect flow
+   e. Wire `StorageClient` in attachment upload using the existing pattern from the storage utils
