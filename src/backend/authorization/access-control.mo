@@ -37,6 +37,16 @@ module {
     };
   };
 
+  // Allows a user to claim admin when no admin has been assigned yet.
+  // This is safe: once an admin exists, this function does nothing.
+  public func claimFirstAdmin(state : AccessControlState, caller : Principal) {
+    if (caller.isAnonymous()) { return };
+    if (not state.adminAssigned) {
+      state.userRoles.add(caller, #admin);
+      state.adminAssigned := true;
+    };
+  };
+
   public func getUserRole(state : AccessControlState, caller : Principal) : UserRole {
     if (caller.isAnonymous()) { return #guest };
     switch (state.userRoles.get(caller)) {

@@ -199,7 +199,7 @@ export default function App() {
     isLoading: profileLoading,
     isFetched: profileFetched,
   } = useGetCallerUserProfile();
-  const { data: isAdmin = false } = useIsCallerAdmin();
+  const { data: isAdmin = false, refetch: refetchIsAdmin } = useIsCallerAdmin();
   const { data: isApproved, isLoading: approvedLoading } =
     useIsCallerApproved();
   const { data: stripeConfigured, isLoading: stripeLoading } =
@@ -221,6 +221,30 @@ export default function App() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [seeded, setSeeded] = useState(false);
   const [allInspections, setAllInspections] = useState<Inspection[]>([]);
+
+  // Attempt to claim first admin for existing registered users who aren't admin yet.
+  // claimFirstAdmin() is a no-op on the backend once an admin is assigned,
+  // so it's safe to call on every login.
+  const adminClaimAttempted = useRef(false);
+  useEffect(() => {
+    if (
+      isAuthenticated &&
+      actor &&
+      !actorFetching &&
+      !isAdmin &&
+      !adminClaimAttempted.current
+    ) {
+      adminClaimAttempted.current = true;
+      (actor as any)
+        .claimFirstAdmin()
+        .then(() => {
+          refetchIsAdmin();
+        })
+        .catch(() => {
+          // ignore — user just stays as non-admin
+        });
+    }
+  }, [isAuthenticated, actor, actorFetching, isAdmin, refetchIsAdmin]);
 
   // Request approval once when user is not yet approved
   const approvalRequested = useRef(false);

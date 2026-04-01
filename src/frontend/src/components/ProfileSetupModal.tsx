@@ -28,7 +28,8 @@ export function ProfileSetupModal({ open }: ProfileSetupModalProps) {
     if (!name.trim()) return;
     try {
       if (actor) {
-        await actor._initializeAccessControlWithSecret("");
+        // Claim admin if no admin has been assigned yet (first user becomes admin)
+        await (actor as any).claimFirstAdmin();
       }
       await mutateAsync({ name: name.trim() });
     } catch (err: any) {
