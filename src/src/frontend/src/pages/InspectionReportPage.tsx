@@ -1,8 +1,12 @@
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, Printer } from "lucide-react";
+import { ArrowLeft, Paperclip, Printer } from "lucide-react";
 import { useEffect } from "react";
 import { InspectionStatus } from "../backend";
-import { useGetDoor, useGetInspection } from "../hooks/useQueries";
+import {
+  useGetDoor,
+  useGetDoorAttachments,
+  useGetInspection,
+} from "../hooks/useQueries";
 
 const CHECKLIST_LABELS: Record<string, string> = {
   frame: "Frame Condition",
@@ -40,6 +44,7 @@ export function InspectionReportPage({
   onBack,
 }: InspectionReportPageProps) {
   const { data: door, isLoading: doorLoading } = useGetDoor(doorId);
+  const { data: attachments } = useGetDoorAttachments(doorId);
   const { data: inspection, isLoading: inspLoading } =
     useGetInspection(inspectionId);
 
@@ -135,6 +140,21 @@ export function InspectionReportPage({
     statusConfig[inspection.overallStatus] ??
     statusConfig[InspectionStatus.fail];
 
+  const doorReferenceFields: [string, string][] = [
+    ["Door ID", `#${door.id.toString().padStart(3, "0")}`],
+    ["Building", door.building],
+    ["Floor", door.floor],
+    ["Location", door.location],
+    ...(door.dimensions
+      ? [["Dimensions", door.dimensions] as [string, string]]
+      : []),
+    ["Door Type", door.doorType],
+    ["Leaf Configuration", door.leafConfig],
+    ["Door Material", door.doorMaterial],
+    ["Frame Material", door.frameMaterial],
+    ["Fire Rating", FIRE_RATING_LABELS[door.fireRating] ?? door.fireRating],
+  ];
+
   const renderChecklistCol = (entries: [string, boolean][]) =>
     entries.map(([key, val]) => (
       <div
@@ -187,12 +207,17 @@ export function InspectionReportPage({
         {/* Header bar */}
         <div className="bg-fire-red text-white px-6 py-5">
           <div className="flex flex-wrap items-start justify-between gap-3">
-            <div>
+            <div className="flex items-center gap-3 mb-1">
+              <img
+                src="/assets/screenshot_2026-03-27_at_16.18.34-019d4309-6f13-7322-af88-702e125e6e33.png"
+                alt="HSF Compliance"
+                className="h-10 w-auto bg-white rounded p-0.5 shrink-0"
+              />
               <h1 className="text-xl font-bold tracking-tight">
                 Fire Door Inspection Report
               </h1>
-              <p className="text-white/80 text-sm mt-0.5">{door.company}</p>
             </div>
+            <p className="text-white/80 text-sm mt-0.5">{door.company}</p>
             <div className="text-right text-sm text-white/80">
               <p>Date Printed</p>
               <p className="font-semibold text-white">{today}</p>
@@ -207,20 +232,7 @@ export function InspectionReportPage({
               Door Reference
             </h2>
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-x-6 gap-y-3 text-sm">
-              {[
-                ["Door ID", `#${door.id.toString().padStart(3, "0")}`],
-                ["Building", door.building],
-                ["Floor", door.floor],
-                ["Location", door.location],
-                ["Door Type", door.doorType],
-                ["Leaf Configuration", door.leafConfig],
-                ["Door Material", door.doorMaterial],
-                ["Frame Material", door.frameMaterial],
-                [
-                  "Fire Rating",
-                  FIRE_RATING_LABELS[door.fireRating] ?? door.fireRating,
-                ],
-              ].map(([label, value]) => (
+              {doorReferenceFields.map(([label, value]) => (
                 <div key={label}>
                   <span className="block text-[10px] font-semibold uppercase tracking-wider text-muted-foreground mb-0.5">
                     {label}
@@ -313,10 +325,41 @@ export function InspectionReportPage({
           </div>
         </div>
 
+        {/* Certification & Attachments */}
+        <div className="px-6 py-4 border-t border-border">
+          <div className="report-section">
+            <h2 className="text-xs font-semibold uppercase tracking-widest text-muted-foreground mb-3 pb-1 border-b border-border">
+              Certification &amp; Attachments
+            </h2>
+            {!attachments || attachments.length === 0 ? (
+              <p className="text-sm text-muted-foreground italic">
+                No certification attachments on file.
+              </p>
+            ) : (
+              <ul className="space-y-2">
+                {attachments.map((att) => (
+                  <li
+                    key={att.id.toString()}
+                    className="flex items-center gap-2 text-sm"
+                  >
+                    <Paperclip className="h-4 w-4 text-muted-foreground shrink-0" />
+                    <span className="font-medium">{att.filename}</span>
+                    <span className="text-muted-foreground text-xs ml-auto">
+                      {new Date(
+                        Number(att.uploadedAt) / 1_000_000,
+                      ).toLocaleDateString()}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        </div>
+
         {/* Footer */}
         <div className="px-6 py-3 bg-muted/30 border-t border-border text-xs text-muted-foreground flex flex-wrap justify-between gap-2">
           <span>Report generated on {today}</span>
-          <span>Fire Door Inspection Manager</span>
+          <span>HSF Compliance - Fire Door Inspection</span>
         </div>
       </div>
     </div>

@@ -23,13 +23,13 @@ import { Eye, FileUp, Image, Pencil, Plus, Search, Trash2 } from "lucide-react";
 import { useMemo, useState } from "react";
 import { toast } from "sonner";
 
-import type { LastInspectionInfo } from "../App";
 import type { Door } from "../backend";
 import { BulkImportDialog } from "../components/BulkImportDialog";
 import { DoorModal } from "../components/DoorModal";
 import { QRCodeSVG } from "../components/QRCode";
 import { QRCodeDialog } from "../components/QRCodeDialog";
 import { useDeleteDoor, useGetAllDoors } from "../hooks/useQueries";
+import type { LastInspectionInfo } from "../types";
 
 type Page = "dashboard" | "doors" | "door-detail" | "inspect";
 
@@ -239,8 +239,10 @@ export function DoorsPage({
                         </button>
                       </td>
                       {/* Dimensions */}
-                      <td className="px-3 py-3 text-muted-foreground text-xs">
-                        —
+                      <td className="px-3 py-3 text-muted-foreground text-xs whitespace-nowrap">
+                        {door.dimensions || (
+                          <span className="text-muted-foreground">—</span>
+                        )}
                       </td>
                       {/* Rating */}
                       <td className="px-3 py-3">

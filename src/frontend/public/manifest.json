@@ -1,0 +1,18 @@
+{
+  "name": "HSF Compliance - Fire Door Inspection",
+  "short_name": "HSF Compliance",
+  "description": "Fire door inspection management with QR codes and PDF reports",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0f172a",
+  "theme_color": "#1e3a5f",
+  "orientation": "portrait-primary",
+  "icons": [
+    {
+      "src": "/assets/generated/pwa-icon-transparent.dim_512x512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}

@@ -1,8 +1,12 @@
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, Printer } from "lucide-react";
+import { ArrowLeft, Paperclip, Printer } from "lucide-react";
 import { useEffect } from "react";
 import { InspectionStatus } from "../backend";
-import { useGetDoor, useGetInspection } from "../hooks/useQueries";
+import {
+  useGetDoor,
+  useGetDoorAttachments,
+  useGetInspection,
+} from "../hooks/useQueries";
 
 const CHECKLIST_LABELS: Record<string, string> = {
   frame: "Frame Condition",
@@ -40,6 +44,7 @@ export function InspectionReportPage({
   onBack,
 }: InspectionReportPageProps) {
   const { data: door, isLoading: doorLoading } = useGetDoor(doorId);
+  const { data: attachments } = useGetDoorAttachments(doorId);
   const { data: inspection, isLoading: inspLoading } =
     useGetInspection(inspectionId);
 
@@ -320,10 +325,41 @@ export function InspectionReportPage({
           </div>
         </div>
 
+        {/* Certification & Attachments */}
+        <div className="px-6 py-4 border-t border-border">
+          <div className="report-section">
+            <h2 className="text-xs font-semibold uppercase tracking-widest text-muted-foreground mb-3 pb-1 border-b border-border">
+              Certification &amp; Attachments
+            </h2>
+            {!attachments || attachments.length === 0 ? (
+              <p className="text-sm text-muted-foreground italic">
+                No certification attachments on file.
+              </p>
+            ) : (
+              <ul className="space-y-2">
+                {attachments.map((att) => (
+                  <li
+                    key={att.id.toString()}
+                    className="flex items-center gap-2 text-sm"
+                  >
+                    <Paperclip className="h-4 w-4 text-muted-foreground shrink-0" />
+                    <span className="font-medium">{att.filename}</span>
+                    <span className="text-muted-foreground text-xs ml-auto">
+                      {new Date(
+                        Number(att.uploadedAt) / 1_000_000,
+                      ).toLocaleDateString()}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        </div>
+
         {/* Footer */}
         <div className="px-6 py-3 bg-muted/30 border-t border-border text-xs text-muted-foreground flex flex-wrap justify-between gap-2">
           <span>Report generated on {today}</span>
-          <span>HSF Compliance Fire - Door Inspection Software</span>
+          <span>HSF Compliance - Fire Door Inspection</span>
         </div>
       </div>
     </div>

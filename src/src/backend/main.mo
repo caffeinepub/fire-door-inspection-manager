@@ -10,12 +10,18 @@ import Runtime "mo:core/Runtime";
 import Text "mo:core/Text";
 import AccessControl "authorization/access-control";
 import MixinAuthorization "authorization/MixinAuthorization";
+import BlobStorageMixin "blob-storage/Mixin";
+import Approval "user-approval/approval";
+import Stripe "stripe/stripe";
+import OutCall "http-outcalls/outcall";
 
 
 
 actor {
   type DoorId = Nat;
   type InspectionId = Nat;
+  type AttachmentId = Nat;
+
   module Door {
     public type DoorMaterial = {
       #timber;
@@ -52,6 +58,23 @@ actor {
     };
 
     public type Door = {
+      id : DoorId;
+      company : Text;
+      building : Text;
+      floor : Text;
+      location : Text;
+      dimensions : Text;
+      doorMaterial : DoorMaterial;
+      frameMaterial : FrameMaterial;
+      doorType : DoorType;
+      leafConfig : LeafConfig;
+      fireRating : FireRating;
+      notes : Text;
+      createdAt : Time.Time;
+      active : Bool;
+    };
+
+    public type LegacyDoor = {
       id : DoorId;
       company : Text;
       building : Text;
@@ -107,22 +130,121 @@ actor {
       createdAt : Time.Time;
     };
   };
+
+  public type DoorAttachment = {
+    id : AttachmentId;
+    doorId : DoorId;
+    filename : Text;
+    blobHash : Text;
+    uploadedAt : Time.Time;
+  };
+
   public type UserProfile = {
     name : Text;
   };
 
   var nextDoorId = 1;
   var nextInspectionId = 1;
+  var nextAttachmentId = 1;
 
-  let doors = Map.empty<DoorId, Door.Door>();
+  let doors = Map.empty<DoorId, Door.LegacyDoor>();
+  let doorsV2 = Map.empty<DoorId, Door.Door>();
   let inspections = Map.empty<InspectionId, Inspection.Inspection>();
   let doorInspections = Map.empty<DoorId, List.List<InspectionId>>();
   let userProfiles = Map.empty<Principal, UserProfile>();
+  let doorAttachmentMap = Map.empty<DoorId, List.List<DoorAttachment>>();
 
   let accessControlState = AccessControl.initState();
-  include MixinAuthorization(accessControlState);
+  let approvalState = Approval.initState(accessControlState);
+  var stripeConfig : ?Stripe.StripeConfiguration = null;
 
-  // User Profile Management
+  include MixinAuthorization(accessControlState);
+  include BlobStorageMixin();
+
+  system func postupgrade() {
+    if (doorsV2.size() == 0) {
+      for (legacyDoor in doors.values()) {
+        let newDoor : Door.Door = {
+          id = legacyDoor.id;
+          company = legacyDoor.company;
+          building = legacyDoor.building;
+          floor = legacyDoor.floor;
+          location = legacyDoor.location;
+          dimensions = "";
+          doorMaterial = legacyDoor.doorMaterial;
+          frameMaterial = legacyDoor.frameMaterial;
+          doorType = legacyDoor.doorType;
+          leafConfig = legacyDoor.leafConfig;
+          fireRating = legacyDoor.fireRating;
+          notes = legacyDoor.notes;
+          createdAt = legacyDoor.createdAt;
+          active = legacyDoor.active;
+        };
+        doorsV2.add(newDoor.id, newDoor);
+      };
+    };
+  };
+
+  // ----- User Approval -----
+  public query ({ caller }) func isCallerApproved() : async Bool {
+    // Admins are always approved
+    if (AccessControl.isAdmin(accessControlState, caller)) { return true };
+    Approval.isApproved(approvalState, caller);
+  };
+
+  public shared ({ caller }) func requestApproval() : async () {
+    if (caller.isAnonymous()) {
+      Runtime.trap("Anonymous users cannot request approval");
+    };
+    Approval.requestApproval(approvalState, caller);
+  };
+
+  public query ({ caller }) func listApprovals() : async [Approval.UserApprovalInfo] {
+    if (not AccessControl.isAdmin(accessControlState, caller)) {
+      Runtime.trap("Unauthorized: Only admins can list approvals");
+    };
+    Approval.listApprovals(approvalState);
+  };
+
+  public shared ({ caller }) func setApproval(user : Principal, status : Approval.ApprovalStatus) : async () {
+    if (not AccessControl.isAdmin(accessControlState, caller)) {
+      Runtime.trap("Unauthorized: Only admins can set approvals");
+    };
+    Approval.setApproval(approvalState, user, status);
+  };
+
+  // ----- Stripe Payments -----
+  public query ({ caller }) func isStripeConfigured() : async Bool {
+    if (not AccessControl.isAdmin(accessControlState, caller)) {
+      Runtime.trap("Unauthorized: Only admins can check Stripe configuration");
+    };
+    stripeConfig != null;
+  };
+
+  public shared ({ caller }) func setStripeConfiguration(config : Stripe.StripeConfiguration) : async () {
+    if (not AccessControl.isAdmin(accessControlState, caller)) {
+      Runtime.trap("Unauthorized: Only admins can configure Stripe");
+    };
+    stripeConfig := ?config;
+  };
+
+  public shared ({ caller }) func createCheckoutSession(items : [Stripe.ShoppingItem], successUrl : Text, cancelUrl : Text) : async Text {
+    if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
+      Runtime.trap("Unauthorized: Only users can create checkout sessions");
+    };
+    switch (stripeConfig) {
+      case (null) { Runtime.trap("Stripe is not configured") };
+      case (?config) {
+        await Stripe.createCheckoutSession(config, caller, items, successUrl, cancelUrl, transform);
+      };
+    };
+  };
+
+  public query func transform(input : OutCall.TransformationInput) : async OutCall.TransformationOutput {
+    OutCall.transform(input);
+  };
+
+  // ----- User Profile Management -----
   public query ({ caller }) func getCallerUserProfile() : async ?UserProfile {
     if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
       Runtime.trap("Unauthorized: Only users can access profiles");
@@ -144,7 +266,7 @@ actor {
     userProfiles.add(caller, profile);
   };
 
-  // Door Management (any authenticated user)
+  // ----- Door Management -----
   public shared ({ caller }) func addDoor(door : Door.Door) : async DoorId {
     if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
       Runtime.trap("Unauthorized: You must be logged in to add doors");
@@ -160,7 +282,7 @@ actor {
       createdAt = Time.now();
       active = true;
     };
-    doors.add(doorId, newDoor);
+    doorsV2.add(doorId, newDoor);
     doorId;
   };
 
@@ -171,7 +293,7 @@ actor {
     if (door.company == "") {
       Runtime.trap("Company name cannot be empty");
     };
-    switch (doors.get(doorId)) {
+    switch (doorsV2.get(doorId)) {
       case (null) { Runtime.trap("Door not found"); };
       case (?existingDoor) {
         let updatedDoor : Door.Door = {
@@ -180,6 +302,7 @@ actor {
           building = door.building;
           floor = door.floor;
           location = door.location;
+          dimensions = door.dimensions;
           doorMaterial = door.doorMaterial;
           frameMaterial = door.frameMaterial;
           doorType = door.doorType;
@@ -187,7 +310,7 @@ actor {
           fireRating = door.fireRating;
           notes = door.notes;
         };
-        doors.add(doorId, updatedDoor);
+        doorsV2.add(doorId, updatedDoor);
       };
     };
   };
@@ -196,18 +319,18 @@ actor {
     if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
       Runtime.trap("Unauthorized: You must be logged in to delete doors");
     };
-    switch (doors.get(doorId)) {
+    switch (doorsV2.get(doorId)) {
       case (null) { Runtime.trap("Door not found"); };
       case (?existingDoor) {
         let updatedDoor : Door.Door = {
           existingDoor with active = false;
         };
-        doors.add(doorId, updatedDoor);
+        doorsV2.add(doorId, updatedDoor);
       };
     };
   };
 
-  // Inspection Management (Authenticated users)
+  // ----- Inspection Management -----
   public shared ({ caller }) func addInspection(inspection : Inspection.Inspection) : async InspectionId {
     if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
       Runtime.trap("Unauthorized: Only users can submit inspections");
@@ -218,7 +341,7 @@ actor {
     if (inspection.company == "") {
       Runtime.trap("Company name cannot be empty");
     };
-    if (not doors.containsKey(inspection.doorId)) {
+    if (not doorsV2.containsKey(inspection.doorId)) {
       Runtime.trap("Door not found");
     };
     let inspectionId = nextInspectionId;
@@ -238,12 +361,63 @@ actor {
     inspectionId;
   };
 
-  // Public Query Functions
+  // ----- Attachment Management -----
+  public shared ({ caller }) func addDoorAttachment(doorId : DoorId, filename : Text, blobHash : Text) : async AttachmentId {
+    if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
+      Runtime.trap("Unauthorized: You must be logged in to add attachments");
+    };
+    if (not doorsV2.containsKey(doorId)) {
+      Runtime.trap("Door not found");
+    };
+    let attachmentId = nextAttachmentId;
+    nextAttachmentId += 1;
+    let attachment : DoorAttachment = {
+      id = attachmentId;
+      doorId = doorId;
+      filename = filename;
+      blobHash = blobHash;
+      uploadedAt = Time.now();
+    };
+    let currentAttachments = switch (doorAttachmentMap.get(doorId)) {
+      case (null) { List.empty<DoorAttachment>() };
+      case (?existingList) { existingList };
+    };
+    currentAttachments.add(attachment);
+    doorAttachmentMap.add(doorId, currentAttachments);
+    attachmentId;
+  };
+
+  public query ({ caller }) func getDoorAttachments(doorId : DoorId) : async [DoorAttachment] {
+    if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
+      Runtime.trap("Unauthorized: Only users can view attachments");
+    };
+    let attachmentList = switch (doorAttachmentMap.get(doorId)) {
+      case (null) { List.empty<DoorAttachment>() };
+      case (?list) { list };
+    };
+    attachmentList.toArray();
+  };
+
+  public shared ({ caller }) func removeDoorAttachment(doorId : DoorId, attachmentId : AttachmentId) : async () {
+    if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
+      Runtime.trap("Unauthorized: You must be logged in to remove attachments");
+    };
+    let currentAttachments = switch (doorAttachmentMap.get(doorId)) {
+      case (null) { return };
+      case (?list) { list };
+    };
+    let filtered = currentAttachments.filter(func(a : DoorAttachment) : Bool {
+      a.id != attachmentId
+    });
+    doorAttachmentMap.add(doorId, filtered);
+  };
+
+  // ----- Query Functions -----
   public query ({ caller }) func getAllDoors() : async [Door.Door] {
     if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
       Runtime.trap("Unauthorized: Only users can view doors");
     };
-    doors.values().filter(func(d : Door.Door) : Bool { d.active }).toArray().sort();
+    doorsV2.values().filter(func(d : Door.Door) : Bool { d.active }).toArray().sort();
   };
 
   public query ({ caller }) func getInspectionsForDoor(doorId : DoorId) : async [Inspection.Inspection] {
@@ -268,7 +442,7 @@ actor {
     if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
       Runtime.trap("Unauthorized: Only users can view doors");
     };
-    switch (doors.get(doorId)) {
+    switch (doorsV2.get(doorId)) {
       case (null) { Runtime.trap("Door not found") };
       case (?door) { door };
     };
@@ -288,8 +462,22 @@ actor {
     if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
       Runtime.trap("Unauthorized: Only users can view door count");
     };
-    doors.size();
+    doorsV2.size();
   };
+
+  // Public functions for QR code status page (no authentication required)
+  public query func getPublicDoor(doorId : DoorId) : async ?Door.Door {
+    doorsV2.get(doorId);
+  };
+
+  public query func getPublicInspectionsForDoor(doorId : DoorId) : async [Inspection.Inspection] {
+    let inspectionIds = switch (doorInspections.get(doorId)) {
+      case (null) { List.empty<InspectionId>() };
+      case (?list) { list };
+    };
+    inspectionIds.map<InspectionId, ?Inspection.Inspection>(func(id) { inspections.get(id) }).filterMap<?Inspection.Inspection, Inspection.Inspection>(func(opt) { opt }).toArray();
+  };
+
   public type Door = Door.Door;
   public type Inspection = Inspection.Inspection;
 };

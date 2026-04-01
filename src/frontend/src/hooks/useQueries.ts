@@ -1,3 +1,4 @@
+import type { Principal } from "@icp-sdk/core/principal";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type {
   Door,
@@ -7,6 +8,7 @@ import type {
   UserProfile,
 } from "../backend";
 import { useActor } from "./useActor";
+import { useInternetIdentity } from "./useInternetIdentity";
 
 // Attachment types (pending backend regeneration)
 export type AttachmentId = bigint;
@@ -18,66 +20,91 @@ export interface DoorAttachment {
   uploadedAt: bigint;
 }
 
+// User approval types (new backend methods)
+export enum ApprovalStatus {
+  approved = "approved",
+  rejected = "rejected",
+  pending = "pending",
+}
+export interface UserApprovalInfo {
+  principal: Principal;
+  status: ApprovalStatus;
+}
+export interface StripeConfiguration {
+  secretKey: string;
+  allowedCountries: string[];
+}
+
 export function useGetAllDoors() {
   const { actor } = useActor();
+  const { identity } = useInternetIdentity();
+  const isAuthenticated = !!identity;
   return useQuery<Door[]>({
     queryKey: ["doors"],
     queryFn: async () => {
       if (!actor) return [];
       return actor.getAllDoors();
     },
-    enabled: !!actor,
+    enabled: !!actor && isAuthenticated,
     refetchOnMount: "always",
   });
 }
 
 export function useGetDoorCount() {
   const { actor } = useActor();
+  const { identity } = useInternetIdentity();
+  const isAuthenticated = !!identity;
   return useQuery<bigint>({
     queryKey: ["doorCount"],
     queryFn: async () => {
       if (!actor) return BigInt(0);
       return actor.getDoorCount();
     },
-    enabled: !!actor,
+    enabled: !!actor && isAuthenticated,
   });
 }
 
 export function useGetDoor(doorId: DoorId | null) {
   const { actor } = useActor();
+  const { identity } = useInternetIdentity();
+  const isAuthenticated = !!identity;
   const query = useQuery<Door | null>({
     queryKey: ["door", doorId?.toString()],
     queryFn: async () => {
       if (!actor || doorId === null) return null;
       return actor.getDoor(doorId);
     },
-    enabled: !!actor && doorId !== null,
+    enabled: !!actor && isAuthenticated && doorId !== null,
   });
   return query;
 }
 
 export function useGetInspection(id: InspectionId | null) {
   const { actor } = useActor();
+  const { identity } = useInternetIdentity();
+  const isAuthenticated = !!identity;
   const query = useQuery<Inspection | null>({
     queryKey: ["inspection", id?.toString()],
     queryFn: async () => {
       if (!actor || id === null) return null;
       return actor.getInspection(id);
     },
-    enabled: !!actor && id !== null,
+    enabled: !!actor && isAuthenticated && id !== null,
   });
   return query;
 }
 
 export function useGetInspectionsForDoor(doorId: DoorId | null) {
   const { actor } = useActor();
+  const { identity } = useInternetIdentity();
+  const isAuthenticated = !!identity;
   const query = useQuery<Inspection[]>({
     queryKey: ["inspections", doorId?.toString()],
     queryFn: async () => {
       if (!actor || doorId === null) return [];
       return actor.getInspectionsForDoor(doorId);
     },
-    enabled: !!actor && doorId !== null,
+    enabled: !!actor && isAuthenticated && doorId !== null,
   });
   return {
     ...query,
@@ -87,30 +114,106 @@ export function useGetInspectionsForDoor(doorId: DoorId | null) {
 
 export function useGetCallerUserProfile() {
   const { actor } = useActor();
+  const { identity } = useInternetIdentity();
+  const isAuthenticated = !!identity;
   const query = useQuery<UserProfile | null>({
     queryKey: ["currentUserProfile"],
     queryFn: async () => {
-      if (!actor) throw new Error("Actor not available");
+      if (!actor) return null;
       return actor.getCallerUserProfile();
     },
-    enabled: !!actor,
-    retry: false,
+    enabled: !!actor && isAuthenticated,
   });
   return {
     ...query,
-    isFetched: !!actor && query.isFetched,
+    isFetched: !!actor && isAuthenticated && query.isFetched,
   };
 }
 
 export function useIsCallerAdmin() {
   const { actor } = useActor();
+  const { identity } = useInternetIdentity();
+  const isAuthenticated = !!identity;
   return useQuery<boolean>({
     queryKey: ["isAdmin"],
     queryFn: async () => {
       if (!actor) return false;
       return actor.isCallerAdmin();
     },
-    enabled: !!actor,
+    enabled: !!actor && isAuthenticated,
+  });
+}
+
+export function useIsCallerApproved() {
+  const { actor } = useActor();
+  const { identity } = useInternetIdentity();
+  const isAuthenticated = !!identity;
+  return useQuery<boolean>({
+    queryKey: ["isCallerApproved"],
+    queryFn: async () => {
+      if (!actor) return false;
+      return (actor as any).isCallerApproved() as Promise<boolean>;
+    },
+    enabled: !!actor && isAuthenticated,
+  });
+}
+
+export function useListApprovals() {
+  const { actor } = useActor();
+  const { identity } = useInternetIdentity();
+  const isAuthenticated = !!identity;
+  return useQuery<UserApprovalInfo[]>({
+    queryKey: ["listApprovals"],
+    queryFn: async () => {
+      if (!actor) return [];
+      return (actor as any).listApprovals() as Promise<UserApprovalInfo[]>;
+    },
+    enabled: !!actor && isAuthenticated,
+  });
+}
+
+export function useIsStripeConfigured() {
+  const { actor } = useActor();
+  const { identity } = useInternetIdentity();
+  const isAuthenticated = !!identity;
+  return useQuery<boolean>({
+    queryKey: ["isStripeConfigured"],
+    queryFn: async () => {
+      if (!actor) return false;
+      return (actor as any).isStripeConfigured() as Promise<boolean>;
+    },
+    enabled: !!actor && isAuthenticated,
+  });
+}
+
+export function useSetApproval() {
+  const { actor } = useActor();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({
+      user,
+      status,
+    }: { user: Principal; status: ApprovalStatus }) => {
+      if (!actor) throw new Error("Actor not available");
+      return (actor as any).setApproval(user, status) as Promise<void>;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["listApprovals"] });
+    },
+  });
+}
+
+export function useSetStripeConfiguration() {
+  const { actor } = useActor();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (config: StripeConfiguration) => {
+      if (!actor) throw new Error("Actor not available");
+      return (actor as any).setStripeConfiguration(config) as Promise<void>;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["isStripeConfigured"] });
+    },
   });
 }
 
@@ -221,6 +324,8 @@ export function useGetPublicInspectionsForDoor(doorId: bigint | null) {
 
 export function useGetDoorAttachments(doorId: DoorId | null) {
   const { actor } = useActor();
+  const { identity } = useInternetIdentity();
+  const isAuthenticated = !!identity;
   return useQuery<DoorAttachment[]>({
     queryKey: ["doorAttachments", doorId?.toString()],
     queryFn: async () => {
@@ -229,7 +334,7 @@ export function useGetDoorAttachments(doorId: DoorId | null) {
         DoorAttachment[]
       >;
     },
-    enabled: !!actor && doorId !== null,
+    enabled: !!actor && isAuthenticated && doorId !== null,
   });
 }
 

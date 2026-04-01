@@ -109,6 +109,7 @@ export interface Door {
     createdAt: Time;
     building: string;
     company: string;
+    dimensions: string;
     leafConfig: LeafConfig;
     doorType: DoorType;
     notes: string;
@@ -192,6 +193,8 @@ export interface backendInterface {
     getInspection(inspectionId: InspectionId): Promise<Inspection>;
     getInspectionsForDoor(doorId: DoorId): Promise<Array<Inspection>>;
     getUserProfile(user: Principal): Promise<UserProfile | null>;
+    getPublicDoor(doorId: DoorId): Promise<Door | null>;
+    getPublicInspectionsForDoor(doorId: DoorId): Promise<Array<Inspection>>;
     isCallerAdmin(): Promise<boolean>;
     saveCallerUserProfile(profile: UserProfile): Promise<void>;
 }
@@ -408,6 +411,34 @@ export class Backend implements backendInterface {
             return from_candid_opt_n37(this._uploadFile, this._downloadFile, result);
         }
     }
+    async getPublicDoor(arg0: DoorId): Promise<Door | null> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.getPublicDoor(arg0);
+                return result.length > 0 ? from_candid_Door_n20(this._uploadFile, this._downloadFile, result[0]) : null;
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await this.actor.getPublicDoor(arg0);
+            return result.length > 0 ? from_candid_Door_n20(this._uploadFile, this._downloadFile, result[0]) : null;
+        }
+    }
+    async getPublicInspectionsForDoor(arg0: DoorId): Promise<Array<Inspection>> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.getPublicInspectionsForDoor(arg0);
+                return from_candid_vec_n32(this._uploadFile, this._downloadFile, result);
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await this.actor.getPublicInspectionsForDoor(arg0);
+            return from_candid_vec_n32(this._uploadFile, this._downloadFile, result);
+        }
+    }
     async isCallerAdmin(): Promise<boolean> {
         if (this.processError) {
             try {
@@ -474,6 +505,7 @@ function from_candid_record_n21(_uploadFile: (file: ExternalBlob) => Promise<Uin
     createdAt: _Time;
     building: string;
     company: string;
+    dimensions: string;
     leafConfig: _LeafConfig;
     doorType: _DoorType;
     notes: string;
@@ -488,6 +520,7 @@ function from_candid_record_n21(_uploadFile: (file: ExternalBlob) => Promise<Uin
     createdAt: Time;
     building: string;
     company: string;
+    dimensions: string;
     leafConfig: LeafConfig;
     doorType: DoorType;
     notes: string;
@@ -503,6 +536,7 @@ function from_candid_record_n21(_uploadFile: (file: ExternalBlob) => Promise<Uin
         createdAt: value.createdAt,
         building: value.building,
         company: value.company,
+        dimensions: value.dimensions,
         leafConfig: from_candid_LeafConfig_n22(_uploadFile, _downloadFile, value.leafConfig),
         doorType: from_candid_DoorType_n24(_uploadFile, _downloadFile, value.doorType),
         notes: value.notes,
@@ -689,6 +723,7 @@ function to_candid_record_n2(_uploadFile: (file: ExternalBlob) => Promise<Uint8A
     createdAt: Time;
     building: string;
     company: string;
+    dimensions: string;
     leafConfig: LeafConfig;
     doorType: DoorType;
     notes: string;
@@ -703,6 +738,7 @@ function to_candid_record_n2(_uploadFile: (file: ExternalBlob) => Promise<Uint8A
     createdAt: _Time;
     building: string;
     company: string;
+    dimensions: string;
     leafConfig: _LeafConfig;
     doorType: _DoorType;
     notes: string;
@@ -718,6 +754,7 @@ function to_candid_record_n2(_uploadFile: (file: ExternalBlob) => Promise<Uint8A
         createdAt: value.createdAt,
         building: value.building,
         company: value.company,
+        dimensions: value.dimensions,
         leafConfig: to_candid_LeafConfig_n3(_uploadFile, _downloadFile, value.leafConfig),
         doorType: to_candid_DoorType_n5(_uploadFile, _downloadFile, value.doorType),
         notes: value.notes,

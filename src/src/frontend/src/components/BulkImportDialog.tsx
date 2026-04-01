@@ -92,6 +92,7 @@ interface ParsedRow {
   building: string;
   floor: string;
   location: string;
+  dimensions: string;
   doorType: DoorType;
   doorMaterial: DoorMaterial;
   frameMaterial: FrameMaterial;
@@ -143,6 +144,7 @@ function parseCSV(text: string): ParsedRow[] {
       const frameMaterialRaw = get(row, ["frame_material", "framematerial"]);
       const fireRatingRaw = get(row, ["fire_rating", "firerating"]);
       const leafConfigRaw = get(row, ["leaf_config", "leafconfig"]);
+      const dimensions = get(row, ["dimensions"]);
       const notes = get(row, ["notes"]);
 
       return {
@@ -150,6 +152,7 @@ function parseCSV(text: string): ParsedRow[] {
         building,
         floor,
         location,
+        dimensions,
         doorType: doorTypeRaw ? fuzzyDoorType(doorTypeRaw) : DoorType.single,
         doorMaterial: doorMaterialRaw
           ? fuzzyDoorMaterial(doorMaterialRaw)
@@ -230,6 +233,7 @@ export function BulkImportDialog({ open, onClose }: Props) {
         building: r.building,
         floor: r.floor,
         location: r.location,
+        dimensions: r.dimensions,
         doorType: r.doorType,
         doorMaterial: r.doorMaterial,
         frameMaterial: r.frameMaterial,

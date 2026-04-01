@@ -5,16 +5,16 @@ import { useQueryClient } from "@tanstack/react-query";
 import {
   ClipboardList,
   DoorOpen,
-  Flame,
   LayoutDashboard,
   Loader2,
   LogIn,
   LogOut,
   Menu,
+  Settings,
   X,
 } from "lucide-react";
 import { motion } from "motion/react";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   type Checklist,
   DoorMaterial,
@@ -34,13 +34,24 @@ import {
   useGetCallerUserProfile,
   useGetInspectionsForDoor,
   useIsCallerAdmin,
+  useIsCallerApproved,
+  useIsStripeConfigured,
 } from "./hooks/useQueries";
+import { AdminPage } from "./pages/AdminPage";
+import { CompanyReportPage } from "./pages/CompanyReportPage";
 import { Dashboard } from "./pages/Dashboard";
 import { DoorDetailPage } from "./pages/DoorDetailPage";
 import { DoorStatusPage } from "./pages/DoorStatusPage";
 import { DoorsPage } from "./pages/DoorsPage";
 import { InspectionForm } from "./pages/InspectionForm";
 import { InspectionReportPage } from "./pages/InspectionReportPage";
+import { PaymentFailurePage } from "./pages/PaymentFailurePage";
+import { PaymentSuccessPage } from "./pages/PaymentSuccessPage";
+import { PendingApprovalPage } from "./pages/PendingApprovalPage";
+import { SubscriptionPage } from "./pages/SubscriptionPage";
+import type { LastInspectionInfo } from "./types";
+
+export type { LastInspectionInfo };
 
 type Page =
   | "dashboard"
@@ -48,12 +59,18 @@ type Page =
   | "door-detail"
   | "inspect"
   | "status"
-  | "report";
+  | "report"
+  | "company-report"
+  | "admin"
+  | "payment-success"
+  | "payment-failure"
+  | "subscription";
 
-export interface LastInspectionInfo {
-  date: bigint;
-  status: InspectionStatus;
-  checklist: Checklist;
+function getInitialPage(): Page {
+  const pathname = window.location.pathname;
+  if (pathname === "/payment-success") return "payment-success";
+  if (pathname === "/payment-failure") return "payment-failure";
+  return "dashboard";
 }
 
 const SAMPLE_DOORS: Omit<Door, "id" | "createdAt">[] = [
@@ -68,6 +85,7 @@ const SAMPLE_DOORS: Omit<Door, "id" | "createdAt">[] = [
     fireRating: FireRating.sixtyMinutes,
     leafConfig: LeafConfig.singleLeaf,
     notes: "Main public entrance, high traffic",
+    dimensions: "",
     active: true,
   },
   {
@@ -81,6 +99,7 @@ const SAMPLE_DOORS: Omit<Door, "id" | "createdAt">[] = [
     fireRating: FireRating.ninetyMinutes,
     leafConfig: LeafConfig.singleLeaf,
     notes: "",
+    dimensions: "",
     active: true,
   },
   {
@@ -94,6 +113,7 @@ const SAMPLE_DOORS: Omit<Door, "id" | "createdAt">[] = [
     fireRating: FireRating.sixtyMinutes,
     leafConfig: LeafConfig.doubleLeaf,
     notes: "Adjacent to kitchen area",
+    dimensions: "",
     active: true,
   },
   {
@@ -107,6 +127,7 @@ const SAMPLE_DOORS: Omit<Door, "id" | "createdAt">[] = [
     fireRating: FireRating.thirtyMinutes,
     leafConfig: LeafConfig.singleLeaf,
     notes: "",
+    dimensions: "",
     active: true,
   },
   {
@@ -120,6 +141,7 @@ const SAMPLE_DOORS: Omit<Door, "id" | "createdAt">[] = [
     fireRating: FireRating.oneHundredTwentyMinutes,
     leafConfig: LeafConfig.singleLeaf,
     notes: "High fire risk area",
+    dimensions: "",
     active: true,
   },
   {
@@ -133,6 +155,7 @@ const SAMPLE_DOORS: Omit<Door, "id" | "createdAt">[] = [
     fireRating: FireRating.sixtyMinutes,
     leafConfig: LeafConfig.singleLeaf,
     notes: "",
+    dimensions: "",
     active: true,
   },
   {
@@ -146,6 +169,7 @@ const SAMPLE_DOORS: Omit<Door, "id" | "createdAt">[] = [
     fireRating: FireRating.sixtyMinutes,
     leafConfig: LeafConfig.singleLeaf,
     notes: "Heavy duty industrial use",
+    dimensions: "",
     active: true,
   },
   {
@@ -159,6 +183,7 @@ const SAMPLE_DOORS: Omit<Door, "id" | "createdAt">[] = [
     fireRating: FireRating.ninetyMinutes,
     leafConfig: LeafConfig.singleLeaf,
     notes: "Critical infrastructure",
+    dimensions: "",
     active: true,
   },
 ];
@@ -177,17 +202,40 @@ export default function App() {
     isFetched: profileFetched,
   } = useGetCallerUserProfile();
   const { data: isAdmin = false } = useIsCallerAdmin();
+  const { data: isApproved, isLoading: approvedLoading } =
+    useIsCallerApproved();
+  const { data: stripeConfigured, isLoading: stripeLoading } =
+    useIsStripeConfigured();
   const { data: doors = [] } = useGetAllDoors();
   const addDoor = useAddDoor();
 
-  const [page, setPage] = useState<Page>("dashboard");
+  const [page, setPage] = useState<Page>(getInitialPage);
   const [activeDoorId, setActiveDoorId] = useState<bigint | null>(null);
   const [activeInspectionId, setActiveInspectionId] = useState<bigint | null>(
     null,
   );
+  const [activeCompany, setActiveCompany] = useState<string | null>(null);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [seeded, setSeeded] = useState(false);
   const [allInspections, setAllInspections] = useState<Inspection[]>([]);
+
+  // Request approval once when user is not yet approved
+  const approvalRequested = useRef(false);
+  useEffect(() => {
+    if (
+      isAuthenticated &&
+      actor &&
+      !actorFetching &&
+      !approvedLoading &&
+      isApproved === false &&
+      !approvalRequested.current
+    ) {
+      approvalRequested.current = true;
+      (actor as any).requestApproval().catch(() => {
+        // ignore
+      });
+    }
+  }, [isAuthenticated, actor, actorFetching, approvedLoading, isApproved]);
 
   // Parse URL params on load
   useEffect(() => {
@@ -264,10 +312,11 @@ export default function App() {
   })();
 
   const navigate = useCallback(
-    (p: Page, doorId?: bigint, inspectionId?: bigint) => {
+    (p: Page, doorId?: bigint, inspectionId?: bigint, companyName?: string) => {
       setPage(p);
       setActiveDoorId(doorId ?? null);
       setActiveInspectionId(inspectionId ?? null);
+      setActiveCompany(companyName ?? null);
       setMobileMenuOpen(false);
     },
     [],
@@ -291,15 +340,20 @@ export default function App() {
 
   // Public status page — accessible without login
   if (page === "status" && activeDoorId !== null) {
-    // If user just logged in, redirect to inspect page for that door
     if (isAuthenticated) {
       return (
         <div className="min-h-screen bg-background flex flex-col">
           <header className="bg-fire-red text-white shadow-md">
             <div className="max-w-lg mx-auto px-4 h-14 flex items-center justify-between">
               <div className="flex items-center gap-2.5">
-                <Flame className="w-5 h-5" />
-                <span className="font-bold text-lg">Fire Door Inspector</span>
+                <img
+                  src="/assets/screenshot_2026-03-27_at_16.18.34-019d4309-6f13-7322-af88-702e125e6e33.png"
+                  alt="HSF Compliance"
+                  className="h-8 w-auto bg-white rounded p-0.5 shrink-0"
+                />
+                <span className="font-bold text-lg">
+                  HSF Compliance - Fire Door Inspection
+                </span>
               </div>
               <Button
                 variant="ghost"
@@ -340,6 +394,31 @@ export default function App() {
     );
   }
 
+  // Payment success/failure pages
+  if (page === "payment-success") {
+    return (
+      <PaymentSuccessPage
+        onContinue={() => {
+          window.history.replaceState({}, "", "/");
+          setPage("dashboard");
+        }}
+      />
+    );
+  }
+  if (page === "payment-failure" || page === "subscription") {
+    if (page === "payment-failure") {
+      return (
+        <PaymentFailurePage
+          onRetry={() => {
+            window.history.replaceState({}, "", "/");
+            setPage("subscription");
+          }}
+        />
+      );
+    }
+    return <SubscriptionPage onLogout={handleAuth} />;
+  }
+
   const showProfileSetup =
     isAuthenticated &&
     !profileLoading &&
@@ -350,12 +429,18 @@ export default function App() {
     return (
       <div className="min-h-screen bg-background flex flex-col items-center justify-center p-6">
         <div className="bg-card rounded-2xl shadow-card-hover p-10 max-w-sm w-full text-center space-y-6">
-          <div className="flex items-center justify-center gap-2.5 mb-2">
-            <div className="w-12 h-12 rounded-xl bg-fire-red flex items-center justify-center">
-              <Flame className="w-6 h-6 text-white" />
-            </div>
-            <h1 className="text-2xl font-bold text-foreground">
-              Fire Door Inspector
+          <div className="flex flex-col items-center gap-3 mb-2">
+            <img
+              src="/assets/screenshot_2026-03-27_at_16.18.34-019d4309-6f13-7322-af88-702e125e6e33.png"
+              alt="HSF Compliance"
+              className="h-16 w-auto"
+            />
+            <h1 className="text-xl font-bold text-foreground leading-tight text-center">
+              HSF Compliance - Fire Door Inspection
+              <br />
+              <span className="text-base font-medium text-muted-foreground">
+                Door Inspection Software
+              </span>
             </h1>
           </div>
           <p className="text-muted-foreground text-sm">
@@ -382,7 +467,7 @@ export default function App() {
           </Button>
         </div>
         <footer className="mt-8 text-xs text-muted-foreground">
-          © {new Date().getFullYear()}. Built with ❤️ using{" "}
+          &copy; {new Date().getFullYear()}. Built with ❤️ using{" "}
           <a
             href={`https://caffeine.ai?utm_source=caffeine-footer&utm_medium=referral&utm_content=${encodeURIComponent(window.location.hostname)}`}
             target="_blank"
@@ -396,10 +481,46 @@ export default function App() {
     );
   }
 
+  // Approval gate — show spinner while loading approval status
+  if (isAuthenticated && !actorFetching && actor) {
+    if (approvedLoading) {
+      return (
+        <div
+          className="min-h-screen bg-background flex items-center justify-center"
+          data-ocid="app.loading_state"
+        >
+          <Loader2 className="w-8 h-8 animate-spin text-fire-red" />
+        </div>
+      );
+    }
+    if (!isAdmin && isApproved === false) {
+      return <PendingApprovalPage onLogout={handleAuth} />;
+    }
+  }
+
+  // Payment gate — only for non-admins when Stripe is configured
+  const paymentComplete =
+    localStorage.getItem("hsf_payment_complete") === "true";
+  if (
+    isAuthenticated &&
+    actor &&
+    !actorFetching &&
+    !stripeLoading &&
+    stripeConfigured &&
+    !isAdmin &&
+    !paymentComplete &&
+    isApproved !== false
+  ) {
+    return <SubscriptionPage onLogout={handleAuth} />;
+  }
+
   const navItems = [
     { label: "Dashboard", page: "dashboard" as Page, icon: LayoutDashboard },
     { label: "Doors", page: "doors" as Page, icon: DoorOpen },
     { label: "Inspect", page: "inspect" as Page, icon: ClipboardList },
+    ...(isAdmin
+      ? [{ label: "Admin", page: "admin" as Page, icon: Settings }]
+      : []),
   ];
 
   return (
@@ -413,8 +534,15 @@ export default function App() {
               onClick={() => navigate("dashboard")}
               className="flex items-center gap-2 font-bold text-lg tracking-tight"
             >
-              <Flame className="w-5 h-5" />
-              <span>Fire Door Inspector</span>
+              <img
+                src="/assets/screenshot_2026-03-27_at_16.18.34-019d4309-6f13-7322-af88-702e125e6e33.png"
+                alt="HSF Compliance"
+                className="h-8 w-auto bg-white rounded p-0.5 shrink-0"
+              />
+              <span className="hidden sm:inline font-bold text-base leading-tight">
+                HSF Compliance - Fire Door Inspection
+              </span>
+              <span className="sm:hidden font-bold text-base">HSF</span>
             </button>
             {/* Desktop nav */}
             <nav className="hidden md:flex items-center gap-1">
@@ -521,7 +649,8 @@ export default function App() {
             key={
               page +
               (activeDoorId?.toString() ?? "") +
-              (activeInspectionId?.toString() ?? "")
+              (activeInspectionId?.toString() ?? "") +
+              (activeCompany ?? "")
             }
             initial={{ opacity: 0, y: 8 }}
             animate={{ opacity: 1, y: 0 }}
@@ -548,6 +677,7 @@ export default function App() {
                 preselectedDoorId={activeDoorId}
                 inspectorName={userProfile?.name ?? ""}
                 onNavigate={navigate}
+                lastInspectionMap={lastInspectionMap}
               />
             )}
             {page === "report" &&
@@ -559,13 +689,22 @@ export default function App() {
                   onBack={() => navigate("door-detail", activeDoorId)}
                 />
               )}
+            {page === "company-report" && activeCompany !== null && (
+              <CompanyReportPage
+                company={activeCompany}
+                doors={doors.filter((d) => d.company === activeCompany)}
+                allInspections={allInspections}
+                onBack={() => navigate("inspect")}
+              />
+            )}
+            {page === "admin" && isAdmin && <AdminPage />}
           </motion.div>
         )}
       </main>
 
       {/* Footer */}
       <footer className="no-print border-t border-border py-4 text-center text-xs text-muted-foreground">
-        © {new Date().getFullYear()}. Built with ❤️ using{" "}
+        &copy; {new Date().getFullYear()}. Built with ❤️ using{" "}
         <a
           href={`https://caffeine.ai?utm_source=caffeine-footer&utm_medium=referral&utm_content=${encodeURIComponent(window.location.hostname)}`}
           target="_blank"

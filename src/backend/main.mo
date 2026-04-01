@@ -11,6 +11,9 @@ import Text "mo:core/Text";
 import AccessControl "authorization/access-control";
 import MixinAuthorization "authorization/MixinAuthorization";
 import BlobStorageMixin "blob-storage/Mixin";
+import Approval "user-approval/approval";
+import Stripe "stripe/stripe";
+import OutCall "http-outcalls/outcall";
 
 
 
@@ -54,7 +57,6 @@ actor {
       #oneHundredTwentyMinutes;
     };
 
-    // Current door type (with dimensions)
     public type Door = {
       id : DoorId;
       company : Text;
@@ -72,7 +74,6 @@ actor {
       active : Bool;
     };
 
-    // Legacy door type (without dimensions) — used for migration
     public type LegacyDoor = {
       id : DoorId;
       company : Text;
@@ -146,25 +147,20 @@ actor {
   var nextInspectionId = 1;
   var nextAttachmentId = 1;
 
-  // Legacy stable variable — receives the old on-chain 'doors' data (no dimensions field).
-  // Must keep this name so Motoko maps the existing state into it on upgrade.
   let doors = Map.empty<DoorId, Door.LegacyDoor>();
-
-  // New stable variable — holds Door records with the dimensions field.
   let doorsV2 = Map.empty<DoorId, Door.Door>();
-
   let inspections = Map.empty<InspectionId, Inspection.Inspection>();
   let doorInspections = Map.empty<DoorId, List.List<InspectionId>>();
   let userProfiles = Map.empty<Principal, UserProfile>();
-
-  // Attachment storage
   let doorAttachmentMap = Map.empty<DoorId, List.List<DoorAttachment>>();
 
   let accessControlState = AccessControl.initState();
+  let approvalState = Approval.initState(accessControlState);
+  var stripeConfig : ?Stripe.StripeConfiguration = null;
+
   include MixinAuthorization(accessControlState);
   include BlobStorageMixin();
 
-  // Migration: runs once after upgrade to copy legacy doors into doorsV2.
   system func postupgrade() {
     if (doorsV2.size() == 0) {
       for (legacyDoor in doors.values()) {
@@ -189,10 +185,70 @@ actor {
     };
   };
 
-  // User Profile Management
-  public query ({ caller }) func getCallerUserProfile() : async ?UserProfile {
+  // ----- User Approval -----
+  public query ({ caller }) func isCallerApproved() : async Bool {
+    // Admins are always approved
+    if (AccessControl.isAdmin(accessControlState, caller)) { return true };
+    Approval.isApproved(approvalState, caller);
+  };
+
+  public shared ({ caller }) func requestApproval() : async () {
+    if (caller.isAnonymous()) {
+      Runtime.trap("Anonymous users cannot request approval");
+    };
+    Approval.requestApproval(approvalState, caller);
+  };
+
+  public query ({ caller }) func listApprovals() : async [Approval.UserApprovalInfo] {
+    if (not AccessControl.isAdmin(accessControlState, caller)) {
+      Runtime.trap("Unauthorized: Only admins can list approvals");
+    };
+    Approval.listApprovals(approvalState);
+  };
+
+  public shared ({ caller }) func setApproval(user : Principal, status : Approval.ApprovalStatus) : async () {
+    if (not AccessControl.isAdmin(accessControlState, caller)) {
+      Runtime.trap("Unauthorized: Only admins can set approvals");
+    };
+    Approval.setApproval(approvalState, user, status);
+  };
+
+  // ----- Stripe Payments -----
+  // Returns false for non-admins and anonymous users (does not trap)
+  public query ({ caller }) func isStripeConfigured() : async Bool {
+    if (caller.isAnonymous()) { return false };
+    if (not AccessControl.isAdmin(accessControlState, caller)) { return false };
+    stripeConfig != null;
+  };
+
+  public shared ({ caller }) func setStripeConfiguration(config : Stripe.StripeConfiguration) : async () {
+    if (not AccessControl.isAdmin(accessControlState, caller)) {
+      Runtime.trap("Unauthorized: Only admins can configure Stripe");
+    };
+    stripeConfig := ?config;
+  };
+
+  public shared ({ caller }) func createCheckoutSession(items : [Stripe.ShoppingItem], successUrl : Text, cancelUrl : Text) : async Text {
     if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
-      Runtime.trap("Unauthorized: Only users can access profiles");
+      Runtime.trap("Unauthorized: Only users can create checkout sessions");
+    };
+    switch (stripeConfig) {
+      case (null) { Runtime.trap("Stripe is not configured") };
+      case (?config) {
+        await Stripe.createCheckoutSession(config, caller, items, successUrl, cancelUrl, transform);
+      };
+    };
+  };
+
+  public query func transform(input : OutCall.TransformationInput) : async OutCall.TransformationOutput {
+    OutCall.transform(input);
+  };
+
+  // ----- User Profile Management -----
+  public query ({ caller }) func getCallerUserProfile() : async ?UserProfile {
+    if (caller.isAnonymous()) { return null };
+    if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
+      return null;
     };
     userProfiles.get(caller);
   };
@@ -211,7 +267,7 @@ actor {
     userProfiles.add(caller, profile);
   };
 
-  // Door Management (any authenticated user)
+  // ----- Door Management -----
   public shared ({ caller }) func addDoor(door : Door.Door) : async DoorId {
     if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
       Runtime.trap("Unauthorized: You must be logged in to add doors");
@@ -275,7 +331,7 @@ actor {
     };
   };
 
-  // Inspection Management (Authenticated users)
+  // ----- Inspection Management -----
   public shared ({ caller }) func addInspection(inspection : Inspection.Inspection) : async InspectionId {
     if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
       Runtime.trap("Unauthorized: Only users can submit inspections");
@@ -306,7 +362,7 @@ actor {
     inspectionId;
   };
 
-  // Attachment Management (Authenticated users)
+  // ----- Attachment Management -----
   public shared ({ caller }) func addDoorAttachment(doorId : DoorId, filename : Text, blobHash : Text) : async AttachmentId {
     if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
       Runtime.trap("Unauthorized: You must be logged in to add attachments");
@@ -357,7 +413,7 @@ actor {
     doorAttachmentMap.add(doorId, filtered);
   };
 
-  // Public Query Functions
+  // ----- Query Functions -----
   public query ({ caller }) func getAllDoors() : async [Door.Door] {
     if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
       Runtime.trap("Unauthorized: Only users can view doors");

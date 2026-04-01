@@ -154,7 +154,9 @@ export function DoorStatusPage({
             alt="HSF Compliance"
             className="h-8 w-auto bg-white rounded p-0.5 shrink-0"
           />
-          <span className="font-bold text-lg">HSF Compliance Fire</span>
+          <span className="font-bold text-lg">
+            HSF Compliance - Fire Door Inspection
+          </span>
         </div>
       </header>
 
@@ -279,15 +281,7 @@ export function DoorStatusPage({
       </main>
 
       <footer className="border-t border-border py-4 text-center text-xs text-muted-foreground">
-        © {new Date().getFullYear()}. Built with ❤️ using{" "}
-        <a
-          href={`https://caffeine.ai?utm_source=caffeine-footer&utm_medium=referral&utm_content=${encodeURIComponent(window.location.hostname)}`}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="underline hover:text-foreground"
-        >
-          caffeine.ai
-        </a>
+        © {new Date().getFullYear()} HSF Compliance. All rights reserved.
       </footer>
     </div>
   );

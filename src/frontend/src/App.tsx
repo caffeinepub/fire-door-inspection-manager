@@ -10,10 +10,11 @@ import {
   LogIn,
   LogOut,
   Menu,
+  Settings,
   X,
 } from "lucide-react";
 import { motion } from "motion/react";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   type Checklist,
   DoorMaterial,
@@ -33,7 +34,10 @@ import {
   useGetCallerUserProfile,
   useGetInspectionsForDoor,
   useIsCallerAdmin,
+  useIsCallerApproved,
+  useIsStripeConfigured,
 } from "./hooks/useQueries";
+import { AdminPage } from "./pages/AdminPage";
 import { CompanyReportPage } from "./pages/CompanyReportPage";
 import { Dashboard } from "./pages/Dashboard";
 import { DoorDetailPage } from "./pages/DoorDetailPage";
@@ -41,6 +45,10 @@ import { DoorStatusPage } from "./pages/DoorStatusPage";
 import { DoorsPage } from "./pages/DoorsPage";
 import { InspectionForm } from "./pages/InspectionForm";
 import { InspectionReportPage } from "./pages/InspectionReportPage";
+import { PaymentFailurePage } from "./pages/PaymentFailurePage";
+import { PaymentSuccessPage } from "./pages/PaymentSuccessPage";
+import { PendingApprovalPage } from "./pages/PendingApprovalPage";
+import { SubscriptionPage } from "./pages/SubscriptionPage";
 import type { LastInspectionInfo } from "./types";
 
 export type { LastInspectionInfo };
@@ -52,7 +60,18 @@ type Page =
   | "inspect"
   | "status"
   | "report"
-  | "company-report";
+  | "company-report"
+  | "admin"
+  | "payment-success"
+  | "payment-failure"
+  | "subscription";
+
+function getInitialPage(): Page {
+  const pathname = window.location.pathname;
+  if (pathname === "/payment-success") return "payment-success";
+  if (pathname === "/payment-failure") return "payment-failure";
+  return "dashboard";
+}
 
 const SAMPLE_DOORS: Omit<Door, "id" | "createdAt">[] = [
   {
@@ -175,18 +194,25 @@ export default function App() {
   const queryClient = useQueryClient();
   const isAuthenticated = !!identity;
 
-  const initialLoading = !actor && actorFetching;
-
   const {
     data: userProfile,
     isLoading: profileLoading,
     isFetched: profileFetched,
   } = useGetCallerUserProfile();
   const { data: isAdmin = false } = useIsCallerAdmin();
+  const { data: isApproved, isLoading: approvedLoading } =
+    useIsCallerApproved();
+  const { data: stripeConfigured, isLoading: stripeLoading } =
+    useIsStripeConfigured();
   const { data: doors = [] } = useGetAllDoors();
   const addDoor = useAddDoor();
 
-  const [page, setPage] = useState<Page>("dashboard");
+  // Show spinner during initial actor fetch OR while approval status is loading after login
+  const initialLoading =
+    (!actor && actorFetching) ||
+    (isAuthenticated && !!actor && !actorFetching && approvedLoading);
+
+  const [page, setPage] = useState<Page>(getInitialPage);
   const [activeDoorId, setActiveDoorId] = useState<bigint | null>(null);
   const [activeInspectionId, setActiveInspectionId] = useState<bigint | null>(
     null,
@@ -195,6 +221,24 @@ export default function App() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [seeded, setSeeded] = useState(false);
   const [allInspections, setAllInspections] = useState<Inspection[]>([]);
+
+  // Request approval once when user is not yet approved
+  const approvalRequested = useRef(false);
+  useEffect(() => {
+    if (
+      isAuthenticated &&
+      actor &&
+      !actorFetching &&
+      !approvedLoading &&
+      isApproved === false &&
+      !approvalRequested.current
+    ) {
+      approvalRequested.current = true;
+      (actor as any).requestApproval().catch(() => {
+        // ignore
+      });
+    }
+  }, [isAuthenticated, actor, actorFetching, approvedLoading, isApproved]);
 
   // Parse URL params on load
   useEffect(() => {
@@ -310,7 +354,9 @@ export default function App() {
                   alt="HSF Compliance"
                   className="h-8 w-auto bg-white rounded p-0.5 shrink-0"
                 />
-                <span className="font-bold text-lg">HSF Compliance Fire</span>
+                <span className="font-bold text-lg">
+                  HSF Compliance - Fire Door Inspection
+                </span>
               </div>
               <Button
                 variant="ghost"
@@ -351,6 +397,31 @@ export default function App() {
     );
   }
 
+  // Payment success/failure pages
+  if (page === "payment-success") {
+    return (
+      <PaymentSuccessPage
+        onContinue={() => {
+          window.history.replaceState({}, "", "/");
+          setPage("dashboard");
+        }}
+      />
+    );
+  }
+  if (page === "payment-failure" || page === "subscription") {
+    if (page === "payment-failure") {
+      return (
+        <PaymentFailurePage
+          onRetry={() => {
+            window.history.replaceState({}, "", "/");
+            setPage("subscription");
+          }}
+        />
+      );
+    }
+    return <SubscriptionPage onLogout={handleAuth} />;
+  }
+
   const showProfileSetup =
     isAuthenticated &&
     !profileLoading &&
@@ -368,7 +439,7 @@ export default function App() {
               className="h-16 w-auto"
             />
             <h1 className="text-xl font-bold text-foreground leading-tight text-center">
-              HSF Compliance Fire
+              HSF Compliance - Fire Door Inspection
               <br />
               <span className="text-base font-medium text-muted-foreground">
                 Door Inspection Software
@@ -399,24 +470,47 @@ export default function App() {
           </Button>
         </div>
         <footer className="mt-8 text-xs text-muted-foreground">
-          &copy; {new Date().getFullYear()}. Built with ❤️ using{" "}
-          <a
-            href={`https://caffeine.ai?utm_source=caffeine-footer&utm_medium=referral&utm_content=${encodeURIComponent(window.location.hostname)}`}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="underline hover:text-foreground"
-          >
-            caffeine.ai
-          </a>
+          &copy; {new Date().getFullYear()} HSF Compliance. All rights reserved.
         </footer>
       </div>
     );
+  }
+
+  // Pending approval gate (shows full page with content, not a blank spinner)
+  if (
+    isAuthenticated &&
+    !actorFetching &&
+    actor &&
+    !approvedLoading &&
+    !isAdmin &&
+    isApproved === false
+  ) {
+    return <PendingApprovalPage onLogout={handleAuth} />;
+  }
+
+  // Payment gate — only for non-admins when Stripe is configured
+  const paymentComplete =
+    localStorage.getItem("hsf_payment_complete") === "true";
+  if (
+    isAuthenticated &&
+    actor &&
+    !actorFetching &&
+    !stripeLoading &&
+    stripeConfigured &&
+    !isAdmin &&
+    !paymentComplete &&
+    isApproved !== false
+  ) {
+    return <SubscriptionPage onLogout={handleAuth} />;
   }
 
   const navItems = [
     { label: "Dashboard", page: "dashboard" as Page, icon: LayoutDashboard },
     { label: "Doors", page: "doors" as Page, icon: DoorOpen },
     { label: "Inspect", page: "inspect" as Page, icon: ClipboardList },
+    ...(isAdmin
+      ? [{ label: "Admin", page: "admin" as Page, icon: Settings }]
+      : []),
   ];
 
   return (
@@ -436,7 +530,7 @@ export default function App() {
                 className="h-8 w-auto bg-white rounded p-0.5 shrink-0"
               />
               <span className="hidden sm:inline font-bold text-base leading-tight">
-                HSF Compliance Fire
+                HSF Compliance - Fire Door Inspection
               </span>
               <span className="sm:hidden font-bold text-base">HSF</span>
             </button>
@@ -593,21 +687,14 @@ export default function App() {
                 onBack={() => navigate("inspect")}
               />
             )}
+            {page === "admin" && isAdmin && <AdminPage />}
           </motion.div>
         )}
       </main>
 
       {/* Footer */}
       <footer className="no-print border-t border-border py-4 text-center text-xs text-muted-foreground">
-        &copy; {new Date().getFullYear()}. Built with ❤️ using{" "}
-        <a
-          href={`https://caffeine.ai?utm_source=caffeine-footer&utm_medium=referral&utm_content=${encodeURIComponent(window.location.hostname)}`}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="underline hover:text-foreground"
-        >
-          caffeine.ai
-        </a>
+        &copy; {new Date().getFullYear()} HSF Compliance. All rights reserved.
       </footer>
 
       <ProfileSetupModal open={showProfileSetup} />
