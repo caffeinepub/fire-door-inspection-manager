@@ -15,12 +15,6 @@ mixin (accessControlState : AccessControl.AccessControlState) {
     };
   };
 
-  // Claim admin role when no admin has been assigned yet.
-  // Safe to call at any time: once an admin exists it is a no-op.
-  public shared ({ caller }) func claimFirstAdmin() : async () {
-    AccessControl.claimFirstAdmin(accessControlState, caller);
-  };
-
   public query ({ caller }) func getCallerUserRole() : async AccessControl.UserRole {
     AccessControl.getUserRole(accessControlState, caller);
   };

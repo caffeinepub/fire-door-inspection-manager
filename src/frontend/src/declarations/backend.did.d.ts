@@ -43,6 +43,7 @@ export interface Door {
   'fireRating' : FireRating,
 }
 export type DoorId = bigint;
+export type AttachmentId = bigint;
 export type DoorMaterial = { 'timber' : null } |
   { 'aluminium' : null } |
   { 'hybrid' : null } |
@@ -82,11 +83,37 @@ export interface UserProfile { 'name' : string }
 export type UserRole = { 'admin' : null } |
   { 'user' : null } |
   { 'guest' : null };
+export type ApprovalStatus = { 'approved' : null } |
+  { 'rejected' : null } |
+  { 'pending' : null };
+export interface UserApprovalInfo {
+  'principal' : Principal,
+  'status' : ApprovalStatus,
+}
+export interface DoorAttachment {
+  'id' : AttachmentId,
+  'doorId' : DoorId,
+  'filename' : string,
+  'blobHash' : string,
+  'uploadedAt' : Time,
+}
+export interface StripeConfiguration {
+  'secretKey' : string,
+  'allowedCountries' : Array<string>,
+}
+export interface ShoppingItem {
+  'currency' : string,
+  'productName' : string,
+  'productDescription' : string,
+  'priceInCents' : bigint,
+  'quantity' : bigint,
+}
 export interface _SERVICE {
   '_initializeAccessControlWithSecret' : ActorMethod<[string], undefined>,
   'addDoor' : ActorMethod<[Door], DoorId>,
   'addInspection' : ActorMethod<[Inspection], InspectionId>,
   'assignCallerUserRole' : ActorMethod<[Principal, UserRole], undefined>,
+  'claimFirstAdmin' : ActorMethod<[], boolean>,
   'deleteDoor' : ActorMethod<[DoorId], undefined>,
   'editDoor' : ActorMethod<[DoorId, Door], undefined>,
   'getAllDoors' : ActorMethod<[], Array<Door>>,
@@ -101,7 +128,17 @@ export interface _SERVICE {
   'getPublicDoor' : ActorMethod<[DoorId], [] | [Door]>,
   'getPublicInspectionsForDoor' : ActorMethod<[DoorId], Array<Inspection>>,
   'isCallerAdmin' : ActorMethod<[], boolean>,
+  'isCallerApproved' : ActorMethod<[], boolean>,
+  'isStripeConfigured' : ActorMethod<[], boolean>,
+  'listApprovals' : ActorMethod<[], Array<UserApprovalInfo>>,
+  'requestApproval' : ActorMethod<[], undefined>,
   'saveCallerUserProfile' : ActorMethod<[UserProfile], undefined>,
+  'setApproval' : ActorMethod<[Principal, ApprovalStatus], undefined>,
+  'setStripeConfiguration' : ActorMethod<[StripeConfiguration], undefined>,
+  'createCheckoutSession' : ActorMethod<[Array<ShoppingItem>, string, string], string>,
+  'addDoorAttachment' : ActorMethod<[DoorId, string, string], AttachmentId>,
+  'getDoorAttachments' : ActorMethod<[DoorId], Array<DoorAttachment>>,
+  'removeDoorAttachment' : ActorMethod<[DoorId, AttachmentId], undefined>,
 }
 export declare const idlService: IDL.ServiceClass;
 export declare const idlInitArgs: IDL.Type[];

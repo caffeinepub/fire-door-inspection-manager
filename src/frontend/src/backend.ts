@@ -467,6 +467,159 @@ export class Backend implements backendInterface {
             return result;
         }
     }
+    async claimFirstAdmin(): Promise<boolean> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.claimFirstAdmin();
+                return result;
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await this.actor.claimFirstAdmin();
+            return result;
+        }
+    }
+    async isCallerApproved(): Promise<boolean> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.isCallerApproved();
+                return result;
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await this.actor.isCallerApproved();
+            return result;
+        }
+    }
+    async requestApproval(): Promise<void> {
+        if (this.processError) {
+            try {
+                return await this.actor.requestApproval();
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            return await this.actor.requestApproval();
+        }
+    }
+    async listApprovals(): Promise<any[]> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.listApprovals();
+                return result.map((item) => ({
+                    principal: item.principal,
+                    status: "approved" in item.status ? "approved" : "rejected" in item.status ? "rejected" : "pending",
+                }));
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await this.actor.listApprovals();
+            return result.map((item) => ({
+                principal: item.principal,
+                status: "approved" in item.status ? "approved" : "rejected" in item.status ? "rejected" : "pending",
+            }));
+        }
+    }
+    async setApproval(user: any, status: string): Promise<void> {
+        const candidStatus = status === "approved" ? { approved: null } : status === "rejected" ? { rejected: null } : { pending: null };
+        if (this.processError) {
+            try {
+                return await this.actor.setApproval(user, candidStatus);
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            return await this.actor.setApproval(user, candidStatus);
+        }
+    }
+    async isStripeConfigured(): Promise<boolean> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.isStripeConfigured();
+                return result;
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await this.actor.isStripeConfigured();
+            return result;
+        }
+    }
+    async setStripeConfiguration(config: any): Promise<void> {
+        if (this.processError) {
+            try {
+                return await this.actor.setStripeConfiguration(config);
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            return await this.actor.setStripeConfiguration(config);
+        }
+    }
+    async createCheckoutSession(items: any[], successUrl: string, cancelUrl: string): Promise<string> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.createCheckoutSession(items, successUrl, cancelUrl);
+                return result;
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await this.actor.createCheckoutSession(items, successUrl, cancelUrl);
+            return result;
+        }
+    }
+    async addDoorAttachment(doorId: bigint, filename: string, blobHash: string): Promise<bigint> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.addDoorAttachment(doorId, filename, blobHash);
+                return result;
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await this.actor.addDoorAttachment(doorId, filename, blobHash);
+            return result;
+        }
+    }
+    async getDoorAttachments(doorId: bigint): Promise<any[]> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.getDoorAttachments(doorId);
+                return result;
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await this.actor.getDoorAttachments(doorId);
+            return result;
+        }
+    }
+    async removeDoorAttachment(doorId: bigint, attachmentId: bigint): Promise<void> {
+        if (this.processError) {
+            try {
+                return await this.actor.removeDoorAttachment(doorId, attachmentId);
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            return await this.actor.removeDoorAttachment(doorId, attachmentId);
+        }
+    }
 }
 function from_candid_DoorMaterial_n26(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: _DoorMaterial): DoorMaterial {
     return from_candid_variant_n27(_uploadFile, _downloadFile, value);

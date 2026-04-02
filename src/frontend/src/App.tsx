@@ -200,8 +200,11 @@ export default function App() {
     isFetched: profileFetched,
   } = useGetCallerUserProfile();
   const { data: isAdmin = false, refetch: refetchIsAdmin } = useIsCallerAdmin();
-  const { data: isApproved, isLoading: approvedLoading } =
-    useIsCallerApproved();
+  const {
+    data: isApproved,
+    isLoading: approvedLoading,
+    refetch: refetchIsApproved,
+  } = useIsCallerApproved();
   const { data: stripeConfigured, isLoading: stripeLoading } =
     useIsStripeConfigured();
   const { data: doors = [] } = useGetAllDoors();
@@ -235,16 +238,31 @@ export default function App() {
       !adminClaimAttempted.current
     ) {
       adminClaimAttempted.current = true;
-      (actor as any)
-        .claimFirstAdmin()
-        .then(() => {
-          refetchIsAdmin();
-        })
-        .catch(() => {
-          // ignore — user just stays as non-admin
-        });
+      try {
+        const claimFn = (actor as any).claimFirstAdmin;
+        if (typeof claimFn === "function") {
+          claimFn
+            .call(actor)
+            .then((claimed: boolean) => {
+              if (claimed) {
+                refetchIsAdmin();
+                refetchIsApproved();
+              }
+            })
+            .catch(() => {});
+        }
+      } catch {
+        // ignore — method may not exist on this actor version
+      }
     }
-  }, [isAuthenticated, actor, actorFetching, isAdmin, refetchIsAdmin]);
+  }, [
+    isAuthenticated,
+    actor,
+    actorFetching,
+    isAdmin,
+    refetchIsAdmin,
+    refetchIsApproved,
+  ]);
 
   // Request approval once when user is not yet approved
   const approvalRequested = useRef(false);
@@ -258,9 +276,14 @@ export default function App() {
       !approvalRequested.current
     ) {
       approvalRequested.current = true;
-      (actor as any).requestApproval().catch(() => {
+      try {
+        const approvalFn = (actor as any).requestApproval;
+        if (typeof approvalFn === "function") {
+          approvalFn.call(actor).catch(() => {});
+        }
+      } catch {
         // ignore
-      });
+      }
     }
   }, [isAuthenticated, actor, actorFetching, approvedLoading, isApproved]);
 

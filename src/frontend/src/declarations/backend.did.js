@@ -9,6 +9,7 @@
 import { IDL } from '@icp-sdk/core/candid';
 
 export const DoorId = IDL.Nat;
+export const AttachmentId = IDL.Nat;
 export const Time = IDL.Int;
 export const LeafConfig = IDL.Variant({
   'doubleLeaf' : IDL.Null,
@@ -46,6 +47,7 @@ export const Door = IDL.Record({
   'createdAt' : Time,
   'building' : IDL.Text,
   'company' : IDL.Text,
+  'dimensions' : IDL.Text,
   'leafConfig' : LeafConfig,
   'doorType' : DoorType,
   'notes' : IDL.Text,
@@ -93,12 +95,40 @@ export const UserRole = IDL.Variant({
   'guest' : IDL.Null,
 });
 export const UserProfile = IDL.Record({ 'name' : IDL.Text });
+export const ApprovalStatus = IDL.Variant({
+  'approved' : IDL.Null,
+  'rejected' : IDL.Null,
+  'pending' : IDL.Null,
+});
+export const UserApprovalInfo = IDL.Record({
+  'principal' : IDL.Principal,
+  'status' : ApprovalStatus,
+});
+export const DoorAttachment = IDL.Record({
+  'id' : AttachmentId,
+  'doorId' : DoorId,
+  'filename' : IDL.Text,
+  'blobHash' : IDL.Text,
+  'uploadedAt' : Time,
+});
+export const StripeConfiguration = IDL.Record({
+  'secretKey' : IDL.Text,
+  'allowedCountries' : IDL.Vec(IDL.Text),
+});
+export const ShoppingItem = IDL.Record({
+  'currency' : IDL.Text,
+  'productName' : IDL.Text,
+  'productDescription' : IDL.Text,
+  'priceInCents' : IDL.Nat,
+  'quantity' : IDL.Nat,
+});
 
 export const idlService = IDL.Service({
   '_initializeAccessControlWithSecret' : IDL.Func([IDL.Text], [], []),
   'addDoor' : IDL.Func([Door], [DoorId], []),
   'addInspection' : IDL.Func([Inspection], [InspectionId], []),
   'assignCallerUserRole' : IDL.Func([IDL.Principal, UserRole], [], []),
+  'claimFirstAdmin' : IDL.Func([], [IDL.Bool], []),
   'deleteDoor' : IDL.Func([DoorId], [], []),
   'editDoor' : IDL.Func([DoorId, Door], [], []),
   'getAllDoors' : IDL.Func([], [IDL.Vec(Door)], ['query']),
@@ -108,26 +138,29 @@ export const idlService = IDL.Service({
   'getDoor' : IDL.Func([DoorId], [Door], ['query']),
   'getDoorCount' : IDL.Func([], [IDL.Nat], ['query']),
   'getInspection' : IDL.Func([InspectionId], [Inspection], ['query']),
-  'getInspectionsForDoor' : IDL.Func(
-      [DoorId],
-      [IDL.Vec(Inspection)],
-      ['query'],
-    ),
-  'getUserProfile' : IDL.Func(
-      [IDL.Principal],
-      [IDL.Opt(UserProfile)],
-      ['query'],
-    ),
+  'getInspectionsForDoor' : IDL.Func([DoorId], [IDL.Vec(Inspection)], ['query']),
+  'getUserProfile' : IDL.Func([IDL.Principal], [IDL.Opt(UserProfile)], ['query']),
   'getPublicDoor' : IDL.Func([DoorId], [IDL.Opt(Door)], ['query']),
-    'getPublicInspectionsForDoor' : IDL.Func([DoorId], [IDL.Vec(Inspection)], ['query']),
-    'isCallerAdmin' : IDL.Func([], [IDL.Bool], ['query']),
+  'getPublicInspectionsForDoor' : IDL.Func([DoorId], [IDL.Vec(Inspection)], ['query']),
+  'isCallerAdmin' : IDL.Func([], [IDL.Bool], ['query']),
+  'isCallerApproved' : IDL.Func([], [IDL.Bool], ['query']),
+  'isStripeConfigured' : IDL.Func([], [IDL.Bool], ['query']),
+  'listApprovals' : IDL.Func([], [IDL.Vec(UserApprovalInfo)], ['query']),
+  'requestApproval' : IDL.Func([], [], []),
   'saveCallerUserProfile' : IDL.Func([UserProfile], [], []),
+  'setApproval' : IDL.Func([IDL.Principal, ApprovalStatus], [], []),
+  'setStripeConfiguration' : IDL.Func([StripeConfiguration], [], []),
+  'createCheckoutSession' : IDL.Func([IDL.Vec(ShoppingItem), IDL.Text, IDL.Text], [IDL.Text], []),
+  'addDoorAttachment' : IDL.Func([DoorId, IDL.Text, IDL.Text], [AttachmentId], []),
+  'getDoorAttachments' : IDL.Func([DoorId], [IDL.Vec(DoorAttachment)], ['query']),
+  'removeDoorAttachment' : IDL.Func([DoorId, AttachmentId], [], []),
 });
 
 export const idlInitArgs = [];
 
 export const idlFactory = ({ IDL }) => {
   const DoorId = IDL.Nat;
+  const AttachmentId = IDL.Nat;
   const Time = IDL.Int;
   const LeafConfig = IDL.Variant({
     'doubleLeaf' : IDL.Null,
@@ -165,6 +198,7 @@ export const idlFactory = ({ IDL }) => {
     'createdAt' : Time,
     'building' : IDL.Text,
     'company' : IDL.Text,
+    'dimensions' : IDL.Text,
     'leafConfig' : LeafConfig,
     'doorType' : DoorType,
     'notes' : IDL.Text,
@@ -212,12 +246,39 @@ export const idlFactory = ({ IDL }) => {
     'guest' : IDL.Null,
   });
   const UserProfile = IDL.Record({ 'name' : IDL.Text });
-  
+  const ApprovalStatus = IDL.Variant({
+    'approved' : IDL.Null,
+    'rejected' : IDL.Null,
+    'pending' : IDL.Null,
+  });
+  const UserApprovalInfo = IDL.Record({
+    'principal' : IDL.Principal,
+    'status' : ApprovalStatus,
+  });
+  const DoorAttachment = IDL.Record({
+    'id' : AttachmentId,
+    'doorId' : DoorId,
+    'filename' : IDL.Text,
+    'blobHash' : IDL.Text,
+    'uploadedAt' : Time,
+  });
+  const StripeConfiguration = IDL.Record({
+    'secretKey' : IDL.Text,
+    'allowedCountries' : IDL.Vec(IDL.Text),
+  });
+  const ShoppingItem = IDL.Record({
+    'currency' : IDL.Text,
+    'productName' : IDL.Text,
+    'productDescription' : IDL.Text,
+    'priceInCents' : IDL.Nat,
+    'quantity' : IDL.Nat,
+  });
   return IDL.Service({
     '_initializeAccessControlWithSecret' : IDL.Func([IDL.Text], [], []),
     'addDoor' : IDL.Func([Door], [DoorId], []),
     'addInspection' : IDL.Func([Inspection], [InspectionId], []),
     'assignCallerUserRole' : IDL.Func([IDL.Principal, UserRole], [], []),
+    'claimFirstAdmin' : IDL.Func([], [IDL.Bool], []),
     'deleteDoor' : IDL.Func([DoorId], [], []),
     'editDoor' : IDL.Func([DoorId, Door], [], []),
     'getAllDoors' : IDL.Func([], [IDL.Vec(Door)], ['query']),
@@ -227,20 +288,22 @@ export const idlFactory = ({ IDL }) => {
     'getDoor' : IDL.Func([DoorId], [Door], ['query']),
     'getDoorCount' : IDL.Func([], [IDL.Nat], ['query']),
     'getInspection' : IDL.Func([InspectionId], [Inspection], ['query']),
-    'getInspectionsForDoor' : IDL.Func(
-        [DoorId],
-        [IDL.Vec(Inspection)],
-        ['query'],
-      ),
-    'getUserProfile' : IDL.Func(
-        [IDL.Principal],
-        [IDL.Opt(UserProfile)],
-        ['query'],
-      ),
+    'getInspectionsForDoor' : IDL.Func([DoorId], [IDL.Vec(Inspection)], ['query']),
+    'getUserProfile' : IDL.Func([IDL.Principal], [IDL.Opt(UserProfile)], ['query']),
     'getPublicDoor' : IDL.Func([DoorId], [IDL.Opt(Door)], ['query']),
     'getPublicInspectionsForDoor' : IDL.Func([DoorId], [IDL.Vec(Inspection)], ['query']),
     'isCallerAdmin' : IDL.Func([], [IDL.Bool], ['query']),
+    'isCallerApproved' : IDL.Func([], [IDL.Bool], ['query']),
+    'isStripeConfigured' : IDL.Func([], [IDL.Bool], ['query']),
+    'listApprovals' : IDL.Func([], [IDL.Vec(UserApprovalInfo)], ['query']),
+    'requestApproval' : IDL.Func([], [], []),
     'saveCallerUserProfile' : IDL.Func([UserProfile], [], []),
+    'setApproval' : IDL.Func([IDL.Principal, ApprovalStatus], [], []),
+    'setStripeConfiguration' : IDL.Func([StripeConfiguration], [], []),
+    'createCheckoutSession' : IDL.Func([IDL.Vec(ShoppingItem), IDL.Text, IDL.Text], [IDL.Text], []),
+    'addDoorAttachment' : IDL.Func([DoorId, IDL.Text, IDL.Text], [AttachmentId], []),
+    'getDoorAttachments' : IDL.Func([DoorId], [IDL.Vec(DoorAttachment)], ['query']),
+    'removeDoorAttachment' : IDL.Func([DoorId, AttachmentId], [], []),
   });
 };
 

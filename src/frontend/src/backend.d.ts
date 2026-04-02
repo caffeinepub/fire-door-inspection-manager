@@ -141,12 +141,13 @@ export interface backendInterface {
     getPublicInspectionsForDoor(doorId: DoorId): Promise<Array<Inspection>>;
     getUserProfile(user: Principal): Promise<UserProfile | null>;
     isCallerAdmin(): Promise<boolean>;
+    isCallerApproved(): Promise<boolean>;
+    claimFirstAdmin(): Promise<boolean>;
     saveCallerUserProfile(profile: UserProfile): Promise<void>;
     addDoorAttachment(doorId: DoorId, filename: string, blobHash: string): Promise<AttachmentId>;
     getDoorAttachments(doorId: DoorId): Promise<Array<DoorAttachment>>;
     removeDoorAttachment(doorId: DoorId, attachmentId: AttachmentId): Promise<void>;
     _caffeineStorageCreateCertificate(hash: string): Promise<Uint8Array>;
-    isCallerApproved(): Promise<boolean>;
     requestApproval(): Promise<void>;
     listApprovals(): Promise<Array<UserApprovalInfo>>;
     setApproval(user: Principal, status: ApprovalStatus): Promise<void>;
