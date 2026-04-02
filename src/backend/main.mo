@@ -185,6 +185,19 @@ actor {
     };
   };
 
+  // Promote caller to admin if no admin has been assigned yet.
+  // Safe to call repeatedly — it’s a no-op once an admin exists.
+  // Returns true if the caller was promoted, false otherwise.
+  public shared ({ caller }) func claimFirstAdmin() : async Bool {
+    if (caller.isAnonymous()) { return false };
+    if (accessControlState.adminAssigned) { return false };
+    accessControlState.userRoles.add(caller, #admin);
+    accessControlState.adminAssigned := true;
+    // Also mark them as approved
+    Approval.setApproval(approvalState, caller, #approved);
+    true;
+  };
+
   // ----- User Approval -----
   public query ({ caller }) func isCallerApproved() : async Bool {
     // Admins are always approved
