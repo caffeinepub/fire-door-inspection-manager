@@ -139,6 +139,8 @@ export interface _SERVICE {
   'addDoorAttachment' : ActorMethod<[DoorId, string, string], AttachmentId>,
   'getDoorAttachments' : ActorMethod<[DoorId], Array<DoorAttachment>>,
   'removeDoorAttachment' : ActorMethod<[DoorId, AttachmentId], undefined>,
+  'addInspectionPhotos' : ActorMethod<[bigint, Array<string>], undefined>;
+  'getInspectionPhotos' : ActorMethod<[bigint], Array<string>>;
 }
 export declare const idlService: IDL.ServiceClass;
 export declare const idlInitArgs: IDL.Type[];

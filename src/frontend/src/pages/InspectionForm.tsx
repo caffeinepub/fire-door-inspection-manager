@@ -11,11 +11,16 @@ import {
 import { Skeleton } from "@/components/ui/skeleton";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
-import { CheckCircle2, ChevronLeft, Loader2 } from "lucide-react";
-import { useEffect, useState } from "react";
+import { Camera, CheckCircle2, ChevronLeft, Loader2, X } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { type Checklist, InspectionStatus } from "../backend";
-import { useAddInspection, useGetAllDoors } from "../hooks/useQueries";
+import {
+  useAddInspection,
+  useAddInspectionPhotos,
+  useGetAllDoors,
+} from "../hooks/useQueries";
+import { useStorageClient } from "../hooks/useStorageClient";
 import type { LastInspectionInfo } from "../types";
 import { CompanyInspectionWizard } from "./CompanyInspectionWizard";
 
@@ -81,6 +86,8 @@ export function InspectionForm({
   const { data: allDoors = [], isLoading } = useGetAllDoors();
   const doors = allDoors.filter((d) => d.active);
   const addInspection = useAddInspection();
+  const addInspectionPhotos = useAddInspectionPhotos();
+  const { data: storageClient } = useStorageClient();
 
   const [activeTab, setActiveTab] = useState<"single" | "company">("single");
 
@@ -100,9 +107,39 @@ export function InspectionForm({
   const [notes, setNotes] = useState("");
   const [submitted, setSubmitted] = useState(false);
 
+  // Photo state
+  const [photoFiles, setPhotoFiles] = useState<File[]>([]);
+  const [photoPreviewUrls, setPhotoPreviewUrls] = useState<string[]>([]);
+  const [uploadingPhotos, setUploadingPhotos] = useState(false);
+  const photoInputRef = useRef<HTMLInputElement>(null);
+  const galleryInputRef = useRef<HTMLInputElement>(null);
+
   useEffect(() => {
     if (preselectedDoorId) setSelectedDoorId(preselectedDoorId.toString());
   }, [preselectedDoorId]);
+
+  // Cleanup preview URLs on unmount
+  useEffect(() => {
+    return () => {
+      for (const url of photoPreviewUrls) {
+        URL.revokeObjectURL(url);
+      }
+    };
+  }, [photoPreviewUrls]);
+
+  const handlePhotosSelected = (files: FileList | null) => {
+    if (!files || files.length === 0) return;
+    const newFiles = Array.from(files);
+    const newUrls = newFiles.map((f) => URL.createObjectURL(f));
+    setPhotoFiles((prev) => [...prev, ...newFiles]);
+    setPhotoPreviewUrls((prev) => [...prev, ...newUrls]);
+  };
+
+  const removePhoto = (index: number) => {
+    URL.revokeObjectURL(photoPreviewUrls[index]);
+    setPhotoFiles((prev) => prev.filter((_, i) => i !== index));
+    setPhotoPreviewUrls((prev) => prev.filter((_, i) => i !== index));
+  };
 
   const toggleAll = (val: boolean) => {
     setChecklist({
@@ -137,11 +174,33 @@ export function InspectionForm({
       return;
     }
     try {
+      // Upload photos
+      let photoHashes: string[] = [];
+      if (photoFiles.length > 0) {
+        if (!storageClient) {
+          toast.error("Storage not ready, please try again");
+          return;
+        }
+        setUploadingPhotos(true);
+        try {
+          const uploadResults = await Promise.all(
+            photoFiles.map(async (file) => {
+              const bytes = new Uint8Array(await file.arrayBuffer());
+              const { hash } = await storageClient.putFile(bytes, () => {});
+              return hash;
+            }),
+          );
+          photoHashes = uploadResults;
+        } finally {
+          setUploadingPhotos(false);
+        }
+      }
+
       const inspectionDate = BigInt(new Date(date).getTime()) * 1000000n;
       const selectedDoor = doors.find(
         (d) => d.id.toString() === selectedDoorId,
       );
-      await addInspection.mutateAsync({
+      const inspectionId = await addInspection.mutateAsync({
         id: BigInt(0),
         doorId: BigInt(selectedDoorId),
         inspectorName: inspector.trim(),
@@ -152,6 +211,12 @@ export function InspectionForm({
         overallStatus,
         company: selectedDoor?.company ?? "",
       });
+      if (photoHashes.length > 0) {
+        await addInspectionPhotos.mutateAsync({
+          inspectionId,
+          hashes: photoHashes,
+        });
+      }
       toast.success("Inspection submitted successfully!");
       setSubmitted(true);
     } catch (err: any) {
@@ -162,6 +227,8 @@ export function InspectionForm({
   const submittedDoor = submitted
     ? doors.find((d) => d.id.toString() === selectedDoorId)
     : null;
+
+  const isSubmitting = uploadingPhotos || addInspection.isPending;
 
   return (
     <div className="max-w-2xl mx-auto">
@@ -396,16 +463,125 @@ export function InspectionForm({
             </div>
           </div>
 
+          {/* Photos */}
+          <div
+            className="bg-card rounded-[10px] shadow-card p-5 space-y-4"
+            data-ocid="inspection.photos.panel"
+          >
+            <div className="flex items-center justify-between">
+              <div>
+                <h2 className="font-semibold">Photos</h2>
+                <p className="text-sm text-muted-foreground">
+                  Capture or upload photos of the door during inspection
+                </p>
+              </div>
+            </div>
+
+            {/* Hidden file inputs */}
+            <input
+              ref={photoInputRef}
+              type="file"
+              accept="image/*"
+              capture="environment"
+              multiple
+              className="hidden"
+              onChange={(e) => handlePhotosSelected(e.target.files)}
+              data-ocid="inspection.photos.upload_button"
+            />
+            <input
+              ref={galleryInputRef}
+              type="file"
+              accept="image/*"
+              multiple
+              className="hidden"
+              onChange={(e) => handlePhotosSelected(e.target.files)}
+            />
+
+            {/* Action buttons */}
+            <div className="flex gap-3">
+              <Button
+                type="button"
+                variant="outline"
+                className="flex-1 border-[#1e3a5f] text-[#1e3a5f] hover:bg-[#1e3a5f] hover:text-white"
+                onClick={() => photoInputRef.current?.click()}
+              >
+                <Camera className="w-4 h-4 mr-2" />
+                Take Photo
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                className="flex-1"
+                onClick={() => galleryInputRef.current?.click()}
+              >
+                Choose from Gallery
+              </Button>
+            </div>
+
+            {/* Photo thumbnails */}
+            {photoPreviewUrls.length > 0 && (
+              <div className="grid grid-cols-3 gap-2 mt-2">
+                {photoPreviewUrls.map((url, idx) => (
+                  <div
+                    key={url}
+                    className="relative aspect-square rounded-lg overflow-hidden border border-border group"
+                    data-ocid={`inspection.photos.item.${idx + 1}`}
+                  >
+                    <img
+                      src={url}
+                      alt={`Door capture ${idx + 1}`}
+                      className="w-full h-full object-cover"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => removePhoto(idx)}
+                      className="absolute top-1 right-1 w-6 h-6 bg-red-600 text-white rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity shadow-md"
+                      data-ocid={`inspection.photos.delete_button.${idx + 1}`}
+                    >
+                      <X className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {photoFiles.length === 0 && (
+              <div
+                className="border-2 border-dashed border-border rounded-lg p-6 text-center text-muted-foreground text-sm"
+                data-ocid="inspection.photos.dropzone"
+              >
+                <Camera className="w-8 h-8 mx-auto mb-2 opacity-30" />
+                <p>No photos added yet</p>
+                <p className="text-xs mt-0.5">
+                  Tap "Take Photo" to use the camera or choose from your gallery
+                </p>
+              </div>
+            )}
+
+            {uploadingPhotos && (
+              <div
+                className="flex items-center gap-2 text-sm text-muted-foreground"
+                data-ocid="inspection.photos.loading_state"
+              >
+                <Loader2 className="w-4 h-4 animate-spin" />
+                Uploading {photoFiles.length} photo
+                {photoFiles.length !== 1 ? "s" : ""}...
+              </div>
+            )}
+          </div>
+
           <Button
             type="submit"
             className="w-full bg-fire-red hover:bg-fire-red-dark text-white py-3 text-base font-semibold"
-            disabled={addInspection.isPending}
+            disabled={isSubmitting}
             data-ocid="inspection.submit.primary_button"
           >
-            {addInspection.isPending && (
-              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-            )}
-            {addInspection.isPending ? "Submitting..." : "Submit Inspection"}
+            {isSubmitting && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+            {uploadingPhotos
+              ? "Uploading Photos..."
+              : addInspection.isPending
+                ? "Submitting..."
+                : "Submit Inspection"}
           </Button>
         </form>
       )}

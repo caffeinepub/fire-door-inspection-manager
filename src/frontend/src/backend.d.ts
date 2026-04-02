@@ -147,6 +147,8 @@ export interface backendInterface {
     addDoorAttachment(doorId: DoorId, filename: string, blobHash: string): Promise<AttachmentId>;
     getDoorAttachments(doorId: DoorId): Promise<Array<DoorAttachment>>;
     removeDoorAttachment(doorId: DoorId, attachmentId: AttachmentId): Promise<void>;
+    addInspectionPhotos(inspectionId: InspectionId, hashes: Array<string>): Promise<void>;
+    getInspectionPhotos(inspectionId: InspectionId): Promise<Array<string>>;
     _caffeineStorageCreateCertificate(hash: string): Promise<Uint8Array>;
     requestApproval(): Promise<void>;
     listApprovals(): Promise<Array<UserApprovalInfo>>;

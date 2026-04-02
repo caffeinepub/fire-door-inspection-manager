@@ -390,3 +390,37 @@ export function useRemoveDoorAttachment() {
     },
   });
 }
+
+export function useAddInspectionPhotos() {
+  const { actor } = useActor();
+  return useMutation({
+    mutationFn: async ({
+      inspectionId,
+      hashes,
+    }: {
+      inspectionId: bigint;
+      hashes: string[];
+    }) => {
+      if (!actor) throw new Error("Actor not available");
+      return (actor as any).addInspectionPhotos(
+        inspectionId,
+        hashes,
+      ) as Promise<void>;
+    },
+  });
+}
+
+export function useGetInspectionPhotos(inspectionId: bigint | null) {
+  const { actor } = useActor();
+  const { identity } = useInternetIdentity();
+  return useQuery<string[]>({
+    queryKey: ["inspectionPhotos", inspectionId?.toString()],
+    queryFn: async () => {
+      if (!actor || inspectionId === null) return [];
+      return (actor as any).getInspectionPhotos(inspectionId) as Promise<
+        string[]
+      >;
+    },
+    enabled: !!actor && !!identity && inspectionId !== null,
+  });
+}

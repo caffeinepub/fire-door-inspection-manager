@@ -197,6 +197,8 @@ export interface backendInterface {
     getPublicInspectionsForDoor(doorId: DoorId): Promise<Array<Inspection>>;
     isCallerAdmin(): Promise<boolean>;
     saveCallerUserProfile(profile: UserProfile): Promise<void>;
+    addInspectionPhotos(inspectionId: bigint, hashes: string[]): Promise<void>;
+    getInspectionPhotos(inspectionId: bigint): Promise<string[]>;
 }
 import type { Checklist as _Checklist, Door as _Door, DoorId as _DoorId, DoorMaterial as _DoorMaterial, DoorType as _DoorType, FireRating as _FireRating, FrameMaterial as _FrameMaterial, Inspection as _Inspection, InspectionId as _InspectionId, InspectionStatus as _InspectionStatus, LeafConfig as _LeafConfig, Time as _Time, UserProfile as _UserProfile, UserRole as _UserRole } from "./declarations/backend.did.d.ts";
 export class Backend implements backendInterface {
@@ -618,6 +620,32 @@ export class Backend implements backendInterface {
             }
         } else {
             return await this.actor.removeDoorAttachment(doorId, attachmentId);
+        }
+    }
+    async addInspectionPhotos(inspectionId: bigint, hashes: string[]): Promise<void> {
+        if (this.processError) {
+            try {
+                return await this.actor.addInspectionPhotos(inspectionId, hashes);
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            return await this.actor.addInspectionPhotos(inspectionId, hashes);
+        }
+    }
+    async getInspectionPhotos(inspectionId: bigint): Promise<string[]> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.getInspectionPhotos(inspectionId);
+                return result;
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await this.actor.getInspectionPhotos(inspectionId);
+            return result;
         }
     }
 }

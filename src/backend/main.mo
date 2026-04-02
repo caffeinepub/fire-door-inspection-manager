@@ -153,6 +153,7 @@ actor {
   let doorInspections = Map.empty<DoorId, List.List<InspectionId>>();
   let userProfiles = Map.empty<Principal, UserProfile>();
   let doorAttachmentMap = Map.empty<DoorId, List.List<DoorAttachment>>();
+  let inspectionPhotoHashes = Map.empty<InspectionId, List.List<Text>>();
 
   let accessControlState = AccessControl.initState();
   let approvalState = Approval.initState(accessControlState);
@@ -186,7 +187,7 @@ actor {
   };
 
   // Promote caller to admin if no admin has been assigned yet.
-  // Safe to call repeatedly — it’s a no-op once an admin exists.
+  // Safe to call repeatedly — it's a no-op once an admin exists.
   // Returns true if the caller was promoted, false otherwise.
   public shared ({ caller }) func claimFirstAdmin() : async Bool {
     if (caller.isAnonymous()) { return false };
@@ -426,7 +427,35 @@ actor {
     doorAttachmentMap.add(doorId, filtered);
   };
 
-  // ----- Query Functions -----
+  // ----- Inspection Photo Management -----
+  public shared ({ caller }) func addInspectionPhotos(inspectionId : InspectionId, hashes : [Text]) : async () {
+    if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
+      Runtime.trap("Unauthorized: Only users can add inspection photos");
+    };
+    if (not inspections.containsKey(inspectionId)) {
+      Runtime.trap("Inspection not found");
+    };
+    let existing = switch (inspectionPhotoHashes.get(inspectionId)) {
+      case (null) { List.empty<Text>() };
+      case (?list) { list };
+    };
+    for (h in hashes.vals()) {
+      existing.add(h);
+    };
+    inspectionPhotoHashes.add(inspectionId, existing);
+  };
+
+  public query ({ caller }) func getInspectionPhotos(inspectionId : InspectionId) : async [Text] {
+    if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
+      Runtime.trap("Unauthorized: Only users can view inspection photos");
+    };
+    switch (inspectionPhotoHashes.get(inspectionId)) {
+      case (null) { [] };
+      case (?list) { list.toArray() };
+    };
+  };
+
+    // ----- Query Functions -----
   public query ({ caller }) func getAllDoors() : async [Door.Door] {
     if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
       Runtime.trap("Unauthorized: Only users can view doors");

@@ -21,17 +21,20 @@ import {
 import { Textarea } from "@/components/ui/textarea";
 import {
   Building2,
+  Camera,
   CheckCircle2,
   ChevronRight,
   FileText,
   Loader2,
   Printer,
   SkipForward,
+  X,
 } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { type Checklist, type Door, InspectionStatus } from "../backend";
-import { useAddInspection } from "../hooks/useQueries";
+import { useAddInspection, useAddInspectionPhotos } from "../hooks/useQueries";
+import { useStorageClient } from "../hooks/useStorageClient";
 import type { LastInspectionInfo } from "../types";
 
 const defaultChecklist: Checklist = {
@@ -101,6 +104,8 @@ export function CompanyInspectionWizard({
   onNavigate,
 }: CompanyInspectionWizardProps) {
   const addInspection = useAddInspection();
+  const addInspectionPhotos = useAddInspectionPhotos();
+  const { data: storageClient } = useStorageClient();
 
   const [phase, setPhase] = useState<Phase>("picker");
   const [selectedCompany, setSelectedCompany] = useState<string | null>(null);
@@ -119,6 +124,36 @@ export function CompanyInspectionWizard({
     InspectionStatus.pass,
   );
   const [notes, setNotes] = useState("");
+
+  // Photo state (per door)
+  const [photoFiles, setPhotoFiles] = useState<File[]>([]);
+  const [photoPreviewUrls, setPhotoPreviewUrls] = useState<string[]>([]);
+  const [uploadingPhotos, setUploadingPhotos] = useState(false);
+  const photoInputRef = useRef<HTMLInputElement>(null);
+  const galleryInputRef = useRef<HTMLInputElement>(null);
+
+  // Cleanup preview URLs when component unmounts
+  useEffect(() => {
+    return () => {
+      for (const url of photoPreviewUrls) {
+        URL.revokeObjectURL(url);
+      }
+    };
+  }, [photoPreviewUrls]);
+
+  const handlePhotosSelected = (files: FileList | null) => {
+    if (!files || files.length === 0) return;
+    const newFiles = Array.from(files);
+    const newUrls = newFiles.map((f) => URL.createObjectURL(f));
+    setPhotoFiles((prev) => [...prev, ...newFiles]);
+    setPhotoPreviewUrls((prev) => [...prev, ...newUrls]);
+  };
+
+  const removePhoto = (index: number) => {
+    URL.revokeObjectURL(photoPreviewUrls[index]);
+    setPhotoFiles((prev) => prev.filter((_, i) => i !== index));
+    setPhotoPreviewUrls((prev) => prev.filter((_, i) => i !== index));
+  };
 
   const activeDoors = doors.filter((d) => d.active);
   const companies = Array.from(new Set(activeDoors.map((d) => d.company)))
@@ -149,6 +184,12 @@ export function CompanyInspectionWizard({
     setChecklist({ ...defaultChecklist });
     setOverallStatus(InspectionStatus.pass);
     setNotes("");
+    // Reset photos
+    for (const url of photoPreviewUrls) {
+      URL.revokeObjectURL(url);
+    }
+    setPhotoFiles([]);
+    setPhotoPreviewUrls([]);
   };
 
   const toggleAll = (val: boolean) => {
@@ -198,8 +239,30 @@ export function CompanyInspectionWizard({
       return;
     }
     try {
+      // Upload photos first
+      let photoHashes: string[] = [];
+      if (photoFiles.length > 0) {
+        if (!storageClient) {
+          toast.error("Storage not ready, please try again");
+          return;
+        }
+        setUploadingPhotos(true);
+        try {
+          const uploadResults = await Promise.all(
+            photoFiles.map(async (file) => {
+              const bytes = new Uint8Array(await file.arrayBuffer());
+              const { hash } = await storageClient.putFile(bytes, () => {});
+              return hash;
+            }),
+          );
+          photoHashes = uploadResults;
+        } finally {
+          setUploadingPhotos(false);
+        }
+      }
+
       const inspectionDate = BigInt(new Date(date).getTime()) * 1000000n;
-      await addInspection.mutateAsync({
+      const inspectionId = await addInspection.mutateAsync({
         id: BigInt(0),
         doorId: currentDoor.id,
         inspectorName: inspector.trim(),
@@ -210,6 +273,12 @@ export function CompanyInspectionWizard({
         overallStatus,
         company: currentDoor.company,
       });
+      if (photoHashes.length > 0) {
+        await addInspectionPhotos.mutateAsync({
+          inspectionId,
+          hashes: photoHashes,
+        });
+      }
       toast.success(`Door ${currentDoorIndex + 1} inspection saved`);
       const outcome: DoorOutcome = { door: currentDoor, result: overallStatus };
       const next = [...doorOutcomes, outcome];
@@ -225,6 +294,8 @@ export function CompanyInspectionWizard({
       toast.error(err.message || "Failed to submit inspection");
     }
   };
+
+  const isSubmitting = uploadingPhotos || addInspection.isPending;
 
   // ── Phase 0: Company picker ───────────────────────────────────────────
   if (phase === "picker") {
@@ -654,12 +725,114 @@ export function CompanyInspectionWizard({
         </div>
       </div>
 
+      {/* Photos */}
+      <div
+        className="bg-card rounded-[10px] shadow-card p-4 space-y-3"
+        data-ocid="company_wizard.photos.panel"
+      >
+        <div>
+          <h3 className="font-semibold text-sm">Photos</h3>
+          <p className="text-xs text-muted-foreground mt-0.5">
+            Capture or upload photos of this door
+          </p>
+        </div>
+
+        {/* Hidden file inputs */}
+        <input
+          ref={photoInputRef}
+          type="file"
+          accept="image/*"
+          capture="environment"
+          multiple
+          className="hidden"
+          onChange={(e) => handlePhotosSelected(e.target.files)}
+          data-ocid="company_wizard.photos.upload_button"
+        />
+        <input
+          ref={galleryInputRef}
+          type="file"
+          accept="image/*"
+          multiple
+          className="hidden"
+          onChange={(e) => handlePhotosSelected(e.target.files)}
+        />
+
+        {/* Action buttons */}
+        <div className="flex gap-2">
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className="flex-1 border-[#1e3a5f] text-[#1e3a5f] hover:bg-[#1e3a5f] hover:text-white"
+            onClick={() => photoInputRef.current?.click()}
+          >
+            <Camera className="w-4 h-4 mr-1.5" />
+            Camera
+          </Button>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className="flex-1"
+            onClick={() => galleryInputRef.current?.click()}
+          >
+            Gallery
+          </Button>
+        </div>
+
+        {/* Thumbnails */}
+        {photoPreviewUrls.length > 0 && (
+          <div className="grid grid-cols-3 gap-2">
+            {photoPreviewUrls.map((url, idx) => (
+              <div
+                key={url}
+                className="relative aspect-square rounded-lg overflow-hidden border border-border group"
+                data-ocid={`company_wizard.photos.item.${idx + 1}`}
+              >
+                <img
+                  src={url}
+                  alt={`Door capture ${idx + 1}`}
+                  className="w-full h-full object-cover"
+                />
+                <button
+                  type="button"
+                  onClick={() => removePhoto(idx)}
+                  className="absolute top-1 right-1 w-6 h-6 bg-red-600 text-white rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity shadow-md"
+                  data-ocid={`company_wizard.photos.delete_button.${idx + 1}`}
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {photoFiles.length === 0 && (
+          <p
+            className="text-xs text-muted-foreground italic text-center py-2"
+            data-ocid="company_wizard.photos.empty_state"
+          >
+            No photos yet — tap Camera to take a photo
+          </p>
+        )}
+
+        {uploadingPhotos && (
+          <div
+            className="flex items-center gap-2 text-xs text-muted-foreground"
+            data-ocid="company_wizard.photos.loading_state"
+          >
+            <Loader2 className="w-3.5 h-3.5 animate-spin" />
+            Uploading photos...
+          </div>
+        )}
+      </div>
+
       {/* Action buttons */}
       <div className="flex gap-3 pb-4">
         <Button
           variant="outline"
           onClick={handleSkip}
-          disabled={addInspection.isPending}
+          disabled={isSubmitting}
           className="flex-1"
           data-ocid="company_wizard.skip.button"
         >
@@ -668,14 +841,16 @@ export function CompanyInspectionWizard({
         </Button>
         <Button
           onClick={handleSubmit}
-          disabled={addInspection.isPending}
+          disabled={isSubmitting}
           className="flex-1 bg-[#1e3a5f] hover:bg-[#162d4e] text-white"
           data-ocid="company_wizard.submit.primary_button"
         >
-          {addInspection.isPending && (
-            <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-          )}
-          {isLastDoor ? "Submit & Finish" : "Submit & Next"}
+          {isSubmitting && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+          {uploadingPhotos
+            ? "Uploading..."
+            : isLastDoor
+              ? "Submit & Finish"
+              : "Submit & Next"}
         </Button>
       </div>
     </div>

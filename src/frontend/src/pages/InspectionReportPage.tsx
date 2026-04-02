@@ -1,12 +1,14 @@
 import { Button } from "@/components/ui/button";
 import { ArrowLeft, Paperclip, Printer } from "lucide-react";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { InspectionStatus } from "../backend";
 import {
   useGetDoor,
   useGetDoorAttachments,
   useGetInspection,
+  useGetInspectionPhotos,
 } from "../hooks/useQueries";
+import { useStorageClient } from "../hooks/useStorageClient";
 
 const CHECKLIST_LABELS: Record<string, string> = {
   frame: "Frame Condition",
@@ -47,6 +49,34 @@ export function InspectionReportPage({
   const { data: attachments } = useGetDoorAttachments(doorId);
   const { data: inspection, isLoading: inspLoading } =
     useGetInspection(inspectionId);
+  const { data: storageClient } = useStorageClient();
+  const { data: inspectionPhotoHashes = [] } =
+    useGetInspectionPhotos(inspectionId);
+
+  const [photoUrls, setPhotoUrls] = useState<string[]>([]);
+
+  // Load photo URLs when inspection photo hashes and storage client are ready
+  useEffect(() => {
+    if (
+      !inspectionPhotoHashes ||
+      inspectionPhotoHashes.length === 0 ||
+      !storageClient
+    ) {
+      setPhotoUrls([]);
+      return;
+    }
+    let cancelled = false;
+    Promise.all(
+      inspectionPhotoHashes.map((hash) => storageClient.getDirectURL(hash)),
+    )
+      .then((urls) => {
+        if (!cancelled) setPhotoUrls(urls);
+      })
+      .catch(console.error);
+    return () => {
+      cancelled = true;
+    };
+  }, [inspectionPhotoHashes, storageClient]);
 
   useEffect(() => {
     const style = document.createElement("style");
@@ -58,6 +88,7 @@ export function InspectionReportPage({
         .print-report-container { padding: 0 !important; }
         .report-card { box-shadow: none !important; border: 1px solid #e5e7eb !important; }
         .report-section { page-break-inside: avoid; }
+        .report-photos-grid img { max-width: 100%; }
       }
     `;
     document.head.appendChild(style);
@@ -323,6 +354,30 @@ export function InspectionReportPage({
               <span className="font-semibold">{checklistEntries.length}</span>
             </div>
           </div>
+
+          {/* Inspection Photos */}
+          {photoUrls.length > 0 && (
+            <div className="report-section">
+              <h2 className="text-xs font-semibold uppercase tracking-widest text-muted-foreground mb-3 pb-1 border-b border-border">
+                Inspection Photos
+              </h2>
+              <div className="report-photos-grid grid grid-cols-2 sm:grid-cols-3 gap-3">
+                {photoUrls.map((url, idx) => (
+                  <div
+                    key={url}
+                    className="aspect-square rounded-lg overflow-hidden border border-border"
+                    data-ocid={`report.photos.item.${idx + 1}`}
+                  >
+                    <img
+                      src={url}
+                      alt={`Door inspection capture ${idx + 1}`}
+                      className="w-full h-full object-cover"
+                    />
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Certification & Attachments */}

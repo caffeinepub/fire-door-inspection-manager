@@ -154,6 +154,8 @@ export const idlService = IDL.Service({
   'addDoorAttachment' : IDL.Func([DoorId, IDL.Text, IDL.Text], [AttachmentId], []),
   'getDoorAttachments' : IDL.Func([DoorId], [IDL.Vec(DoorAttachment)], ['query']),
   'removeDoorAttachment' : IDL.Func([DoorId, AttachmentId], [], []),
+  'addInspectionPhotos' : IDL.Func([IDL.Nat, IDL.Vec(IDL.Text)], [], []),
+  'getInspectionPhotos' : IDL.Func([IDL.Nat], [IDL.Vec(IDL.Text)], ['query']),
 });
 
 export const idlInitArgs = [];
@@ -304,6 +306,8 @@ export const idlFactory = ({ IDL }) => {
     'addDoorAttachment' : IDL.Func([DoorId, IDL.Text, IDL.Text], [AttachmentId], []),
     'getDoorAttachments' : IDL.Func([DoorId], [IDL.Vec(DoorAttachment)], ['query']),
     'removeDoorAttachment' : IDL.Func([DoorId, AttachmentId], [], []),
+    'addInspectionPhotos' : IDL.Func([IDL.Nat, IDL.Vec(IDL.Text)], [], []),
+    'getInspectionPhotos' : IDL.Func([IDL.Nat], [IDL.Vec(IDL.Text)], ['query']),
   });
 };
 
